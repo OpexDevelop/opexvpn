@@ -190,7 +190,6 @@ jobs:
             echo "Processing Node $((i + 1))/$PROXY_COUNT: $NODE_NAME_RAW (ID: $NODE_ID)"
             TEMP_SINGBOX_CONFIG="temp_singbox_config_${NODE_ID}.json"
 
-            # ИСПРАВЛЕНА КОМАНДА yq для передачи JSON в Python
             yq -r ".proxies[$i] | tojson" sub_clash_config.yaml | python3 scripts/generate_singbox_config.py "$NODE_ID" > "$TEMP_SINGBOX_CONFIG"
 
             if ! grep -q '"type":' "$TEMP_SINGBOX_CONFIG"; then
@@ -228,7 +227,8 @@ jobs:
             ASN_NUMBER=$(echo "$IP_INFO_RAW" | jq -r '.providers.dbip.asn // .providers.ip2location.asn // .providers.ipinfo.asn // .providers.maxmind.asn // "N/A"')
 
             echo "Running speedtest for $NODE_ID..."
-            SPEEDTEST_RESULT_RAW=$(speedtest-cli --proxy "$PROXY_ADDRESS" --simple --timeout 35) || SPEEDTEST_RESULT_RAW="Ping: N/A ms Download: N/A Mbit/s Upload: N/A Mbit/s"
+            # ИСПРАВЛЕНИЕ: Используем ALL_PROXY для speedtest-cli
+            SPEEDTEST_RESULT_RAW=$(ALL_PROXY="$PROXY_ADDRESS" speedtest-cli --simple --timeout 35) || SPEEDTEST_RESULT_RAW="Ping: N/A ms Download: N/A Mbit/s Upload: N/A Mbit/s"
 
             PING=$(echo "$SPEEDTEST_RESULT_RAW" | grep -oP 'Ping: \K[0-9.]+(?= ms)' || echo "N/A")
             DOWNLOAD_SPEED=$(echo "$SPEEDTEST_RESULT_RAW" | grep -oP 'Download: \K[0-9.]+(?= Mbit/s)' || echo "N/A")
