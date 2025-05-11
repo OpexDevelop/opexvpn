@@ -172,7 +172,6 @@ jobs:
 
           RESULTS_JSON_ARRAY="[]"
           
-          # ИСПРАВЛЕНА КОМАНДА yq
           PROXY_COUNT=$(yq '.proxies | length' sub_clash_config.yaml)
           if [ -z "$PROXY_COUNT" ] || [ "$PROXY_COUNT" -eq 0 ]; then
             echo "No proxies found in the converted Clash config."
@@ -183,22 +182,16 @@ jobs:
           echo "Found $PROXY_COUNT proxies to test."
 
           for i in $(seq 0 $((PROXY_COUNT - 1))); do
-            # ИСПРАВЛЕНА КОМАНДА yq
-            CLASH_NODE_JSON=$(yq ".proxies[$i] | tojson" sub_clash_config.yaml)
+            NODE_NAME_RAW=$(yq -r ".proxies[$i].name" sub_clash_config.yaml)
 
-            if [ -z "$CLASH_NODE_JSON" ] || [ "$CLASH_NODE_JSON" == "null" ]; then
-                echo "Failed to extract proxy node $i. Skipping."
-                continue
-            fi
-            
-            NODE_NAME_RAW=$(echo "$CLASH_NODE_JSON" | jq -r .name)
             NODE_ID_SUFFIX=$(echo "$NODE_NAME_RAW" | sed 's/[^a-zA-Z0-9_-]/_/g')"_${i}"
             NODE_ID="node_${NODE_ID_SUFFIX}"
 
             echo "Processing Node $((i + 1))/$PROXY_COUNT: $NODE_NAME_RAW (ID: $NODE_ID)"
             TEMP_SINGBOX_CONFIG="temp_singbox_config_${NODE_ID}.json"
 
-            echo "$CLASH_NODE_JSON" | python3 scripts/generate_singbox_config.py "$NODE_ID" > "$TEMP_SINGBOX_CONFIG"
+            # ИСПРАВЛЕНА КОМАНДА yq для передачи JSON в Python
+            yq -r ".proxies[$i] | tojson" sub_clash_config.yaml | python3 scripts/generate_singbox_config.py "$NODE_ID" > "$TEMP_SINGBOX_CONFIG"
 
             if ! grep -q '"type":' "$TEMP_SINGBOX_CONFIG"; then
                 echo "Failed to generate sing-box config for node $NODE_NAME_RAW. Skipping."
@@ -208,7 +201,7 @@ jobs:
                 rm -f "$TEMP_SINGBOX_CONFIG"
                 continue
             fi
-
+            
             echo "Starting Sing-box for $NODE_ID..."
             sing-box run -c "$TEMP_SINGBOX_CONFIG" &
             SINGBOX_PID=$!
