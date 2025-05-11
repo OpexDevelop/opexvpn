@@ -30,7 +30,7 @@ jobs:
 
       - name: Download and install subconverter
         run: |
-          SUBVERTER_VERSION="v0.8.2"
+          SUBVERTER_VERSION="v0.9.0" # ИСПРАВЛЕННАЯ ВЕРСИЯ
           wget https://github.com/tindy2013/subconverter/releases/download/${SUBVERTER_VERSION}/subconverter_linux64.tar.gz
           tar -xzf subconverter_linux64.tar.gz
           sudo mv subconverter /usr/local/bin/subconverter
@@ -41,7 +41,7 @@ jobs:
 
       - name: Download and install Sing-box
         run: |
-          SINGBOX_VERSION="1.11.10"
+          SINGBOX_VERSION="1.11.10" # Проверьте последнюю стабильную версию, если нужно
           wget https://github.com/SagerNet/sing-box/releases/download/v${SINGBOX_VERSION}/sing-box-${SINGBOX_VERSION}-linux-amd64.tar.gz
           tar -xzf sing-box-${SINGBOX_VERSION}-linux-amd64.tar.gz
           sudo mv sing-box-${SINGBOX_VERSION}-linux-amd64/sing-box /usr/local/bin/sing-box
