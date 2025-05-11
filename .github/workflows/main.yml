@@ -35,8 +35,8 @@ jobs:
           echo "Downloading subconverter..."
           wget https://github.com/tindy2013/subconverter/releases/download/${SUBVERTER_VERSION}/subconverter_linux64.tar.gz
           
-          echo "Removing any pre-existing 'subconverter' file or directory to ensure clean extraction..."
-          rm -rf ./subconverter ./subconverter_linux64 
+          echo "Removing any pre-existing 'subconverter' directory or file to ensure clean extraction..."
+          rm -rf ./subconverter 
           
           echo "Extracting subconverter..."
           tar -xvf subconverter_linux64.tar.gz
@@ -52,8 +52,9 @@ jobs:
           echo "Making subconverter executable: $ACTUAL_SUBCONVERTER_BINARY"
           chmod +x "$ACTUAL_SUBCONVERTER_BINARY"
           
-          echo "Subconverter version check:"
-          "$ACTUAL_SUBCONVERTER_BINARY" -v || echo "Subconverter version check failed."
+          # УБРАНА КОМАНДА ПРОВЕРКИ ВЕРСИИ, ТАК КАК ОНА БЛОКИРОВАЛА ШАГ
+          # echo "Subconverter version check:"
+          # "$ACTUAL_SUBCONVERTER_BINARY" -v || echo "Subconverter version check failed."
           
           echo "Creating minimal pref.ini for subconverter in current directory..."
           cat <<EOF > pref.ini
@@ -72,6 +73,7 @@ jobs:
           EOF
           echo "pref.ini created in current directory (workspace root)."
           echo "subconverter_binary_path=$ACTUAL_SUBCONVERTER_BINARY" >> $GITHUB_OUTPUT
+          echo "Subconverter preparation step completed."
 
       - name: Start and health check subconverter
         run: |
