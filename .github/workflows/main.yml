@@ -121,10 +121,37 @@ jobs:
 
       - name: Download and install Sing-box
         run: |
-          SINGBOX_VERSION="1.11.10"
+          SINGBOX_VERSION="1.11.10" # Вы можете обновить до последней стабильной, например 1.9.0 или новее
+          # Для Sing-box v1.9.x и новее, имя архива изменилось
+          # SINGBOX_ARCHIVE_NAME="sing-box-${SINGBOX_VERSION}-linux-amd64" # Для версий до ~1.8.x
+          SINGBOX_ARCHIVE_NAME="sing-box-${SINGBOX_VERSION}-linux-amd64" # Для v1.9.0+ может быть таким или просто singbox-linux-amd64.zip/tar.gz
+                                                                      # Проверьте актуальное имя на странице релизов Sing-box
+          # Пример для v1.9.0 (если имя архива sing-box-1.9.0-linux-amd64.tar.gz)
+          # wget https://github.com/SagerNet/sing-box/releases/download/v${SINGBOX_VERSION}/${SINGBOX_ARCHIVE_NAME}.tar.gz
+          # tar -xzf ${SINGBOX_ARCHIVE_NAME}.tar.gz
+          # sudo mv ./${SINGBOX_ARCHIVE_NAME}/sing-box /usr/local/bin/sing-box
+
+          # Оставляем для v1.11.10, как было, если это актуально для вас
           wget https://github.com/SagerNet/sing-box/releases/download/v${SINGBOX_VERSION}/sing-box-${SINGBOX_VERSION}-linux-amd64.tar.gz
           tar -xzf sing-box-${SINGBOX_VERSION}-linux-amd64.tar.gz
-          sudo mv sing-box-${SINGBOX_VERSION}-linux-amd64/sing-box /usr/local/bin/sing-box
+          # Путь к бинарнику sing-box после распаковки может быть sing-box-${SINGBOX_VERSION}-linux-amd64/sing-box
+          # или просто sing-box, если архив не создает вложенную папку с версией
+          if [ -f ./sing-box-${SINGBOX_VERSION}-linux-amd64/sing-box ]; then
+            sudo mv ./sing-box-${SINGBOX_VERSION}-linux-amd64/sing-box /usr/local/bin/sing-box
+          elif [ -f ./sing-box ]; then # Если бинарник распаковался в текущую директорию
+             sudo mv ./sing-box /usr/local/bin/sing-box
+          else
+            echo "Sing-box binary not found after extraction. Listing files:"
+            ls -lah
+            # Попробуем найти его в стандартной папке релиза, если она есть
+            RELEASE_DIR_NAME=$(tar -tzf sing-box-${SINGBOX_VERSION}-linux-amd64.tar.gz | head -1 | cut -f1 -d"/")
+            if [ -f ./${RELEASE_DIR_NAME}/sing-box ]; then
+                sudo mv ./${RELEASE_DIR_NAME}/sing-box /usr/local/bin/sing-box
+            else
+                echo "Still cannot find sing-box binary."
+                exit 1
+            fi
+          fi
           sudo chmod +x /usr/local/bin/sing-box
           sing-box version
 
@@ -227,12 +254,36 @@ jobs:
             ASN_NUMBER=$(echo "$IP_INFO_RAW" | jq -r '.providers.dbip.asn // .providers.ip2location.asn // .providers.ipinfo.asn // .providers.maxmind.asn // "N/A"')
 
             echo "Running speedtest for $NODE_ID..."
-            # ИСПРАВЛЕНИЕ: Используем ALL_PROXY для speedtest-cli
-            SPEEDTEST_RESULT_RAW=$(ALL_PROXY="$PROXY_ADDRESS" speedtest-cli --simple --timeout 35) || SPEEDTEST_RESULT_RAW="Ping: N/A ms Download: N/A Mbit/s Upload: N/A Mbit/s"
+            SPEEDTEST_OUTPUT_FILE="speedtest_output_${NODE_ID}.txt"
+            SPEEDTEST_ERROR_FILE="speedtest_error_${NODE_ID}.txt"
+            
+            if ALL_PROXY="$PROXY_ADDRESS" speedtest-cli --simple --timeout 45 > "$SPEEDTEST_OUTPUT_FILE" 2> "$SPEEDTEST_ERROR_FILE"; then
+              SPEEDTEST_RESULT_RAW=$(cat "$SPEEDTEST_OUTPUT_FILE")
+            else
+              echo "Speedtest command failed for $NODE_ID. Exit code: $?"
+              echo "--- Speedtest STDOUT ($SPEEDTEST_OUTPUT_FILE) ---"
+              cat "$SPEEDTEST_OUTPUT_FILE"
+              echo "--- Speedtest STDERR ($SPEEDTEST_ERROR_FILE) ---"
+              cat "$SPEEDTEST_ERROR_FILE"
+              echo "---------------------------------------------"
+              SPEEDTEST_RESULT_RAW="Ping: N/A ms Download: N/A Mbit/s Upload: N/A Mbit/s"
+            fi
+            rm -f "$SPEEDTEST_OUTPUT_FILE" "$SPEEDTEST_ERROR_FILE"
 
             PING=$(echo "$SPEEDTEST_RESULT_RAW" | grep -oP 'Ping: \K[0-9.]+(?= ms)' || echo "N/A")
             DOWNLOAD_SPEED=$(echo "$SPEEDTEST_RESULT_RAW" | grep -oP 'Download: \K[0-9.]+(?= Mbit/s)' || echo "N/A")
             UPLOAD_SPEED=$(echo "$SPEEDTEST_RESULT_RAW" | grep -oP 'Upload: \K[0-9.]+(?= Mbit/s)' || echo "N/A")
+
+            echo "--- Test Results for $NODE_NAME_RAW (ID: $NODE_ID) ---"
+            echo "IP Address: $IP_ADDRESS"
+            echo "Country: $COUNTRY"
+            echo "City: $CITY"
+            echo "ASN Org: $ASN_ORG"
+            echo "ASN Number: $ASN_NUMBER"
+            echo "Ping: $PING ms"
+            echo "Download: $DOWNLOAD_SPEED Mbit/s"
+            echo "Upload: $UPLOAD_SPEED Mbit/s"
+            echo "--------------------------------------------------"
 
             kill -SIGTERM $SINGBOX_PID || echo "Failed to send SIGTERM to Sing-box"
             wait $SINGBOX_PID 2>/dev/null
