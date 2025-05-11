@@ -1,0 +1,181 @@
+name: Test Proxies and Update Results
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */4 * * *'
+
+jobs:
+  test_proxies:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install PyYAML and other dependencies
+        run: |
+          pip install PyYAML
+          sudo apt-get update
+          sudo apt-get install -y curl jq speedtest-cli yq
+
+      - name: Download and install subconverter
+        run: |
+          SUBVERTER_VERSION="v0.8.2"
+          wget https://github.com/tindy2013/subconverter/releases/download/${SUBVERTER_VERSION}/subconverter_linux64.tar.gz
+          tar -xzf subconverter_linux64.tar.gz
+          sudo mv subconverter /usr/local/bin/subconverter
+          sudo chmod +x /usr/local/bin/subconverter
+          subconverter -v || echo "Subconverter version check failed."
+          nohup subconverter > subconverter.log 2>&1 &
+          sleep 5
+
+      - name: Download and install Sing-box
+        run: |
+          SINGBOX_VERSION="1.11.10"
+          wget https://github.com/SagerNet/sing-box/releases/download/v${SINGBOX_VERSION}/sing-box-${SINGBOX_VERSION}-linux-amd64.tar.gz
+          tar -xzf sing-box-${SINGBOX_VERSION}-linux-amd64.tar.gz
+          sudo mv sing-box-${SINGBOX_VERSION}-linux-amd64/sing-box /usr/local/bin/sing-box
+          sudo chmod +x /usr/local/bin/sing-box
+          sing-box version
+
+      - name: Ensure Python script is executable
+        run: chmod +x scripts/generate_singbox_config.py
+
+      - name: Fetch subscription, convert with subconverter, and process nodes
+        id: process_nodes
+        run: |
+          SUBSCRIPTION_URL_RAW="https://gist.githubusercontent.com/OpexDevelop/a676272468c9b6ac804092250ce9bc67/raw/opexvpn-high.txt"
+          SUBSCRIPTION_URL_ENCODED=$(echo "$SUBSCRIPTION_URL_RAW" | jq -sRr @uri)
+
+          echo "Fetching and converting subscription to Clash format..."
+          curl -sL "http://127.0.0.1:25500/sub?target=clash&url=${SUBSCRIPTION_URL_ENCODED}" -o sub_clash_config.yaml
+
+          if [ ! -s sub_clash_config.yaml ]; then
+            echo "Failed to convert subscription or subscription is empty."
+            echo "Subconverter log:"
+            cat subconverter.log
+            exit 1
+          fi
+          echo "Subscription converted to sub_clash_config.yaml"
+
+          RESULTS_JSON_ARRAY="[]"
+          
+          PROXY_COUNT=$(yq '.proxies | length' sub_clash_config.yaml)
+          if [ -z "$PROXY_COUNT" ] || [ "$PROXY_COUNT" -eq 0 ]; then
+            echo "No proxies found in the converted Clash config."
+            # Stop subconverter before exiting if no proxies
+            echo "Stopping subconverter..."
+            pkill subconverter || echo "Subconverter not running or already stopped."
+            exit 0
+          fi
+          echo "Found $PROXY_COUNT proxies to test."
+
+          for i in $(seq 0 $((PROXY_COUNT - 1))); do
+            CLASH_NODE_JSON=$(yq ".proxies[$i]" -o=json sub_clash_config.yaml)
+
+            if [ -z "$CLASH_NODE_JSON" ] || [ "$CLASH_NODE_JSON" == "null" ]; then
+                echo "Failed to extract proxy node $i. Skipping."
+                continue
+            fi
+            
+            NODE_NAME_RAW=$(echo "$CLASH_NODE_JSON" | jq -r .name)
+            NODE_ID_SUFFIX=$(echo "$NODE_NAME_RAW" | sed 's/[^a-zA-Z0-9_-]/_/g')"_${i}"
+            NODE_ID="node_${NODE_ID_SUFFIX}"
+
+            echo "Processing Node $((i + 1))/$PROXY_COUNT: $NODE_NAME_RAW (ID: $NODE_ID)"
+            TEMP_SINGBOX_CONFIG="temp_singbox_config_${NODE_ID}.json"
+
+            echo "$CLASH_NODE_JSON" | python3 scripts/generate_singbox_config.py "$NODE_ID" > "$TEMP_SINGBOX_CONFIG"
+
+            if ! grep -q '"type":' "$TEMP_SINGBOX_CONFIG"; then
+                echo "Failed to generate sing-box config or config is invalid for node $NODE_NAME_RAW. Skipping."
+                cat "$TEMP_SINGBOX_CONFIG"
+                CURRENT_NODE_JSON=$(jq -n --arg name "$NODE_NAME_RAW" --arg error "Config generation failed or invalid" '{name: $name, status: "error", error: $error, timestamp: (now | strftime("%Y-%m-%dT%H:%M:%SZ"))}')
+                RESULTS_JSON_ARRAY=$(echo "$RESULTS_JSON_ARRAY" | jq --argjson item "$CURRENT_NODE_JSON" '. + [$item]')
+                rm -f "$TEMP_SINGBOX_CONFIG"
+                continue
+            fi
+
+            echo "Starting Sing-box for $NODE_ID..."
+            sing-box run -c "$TEMP_SINGBOX_CONFIG" &
+            SINGBOX_PID=$!
+            sleep 8
+
+            if ! ps -p $SINGBOX_PID > /dev/null; then
+                echo "Sing-box failed to start for $NODE_ID. PID: $SINGBOX_PID"
+                kill -9 $SINGBOX_PID > /dev/null 2>&1 || true ; wait $SINGBOX_PID 2>/dev/null
+                CURRENT_NODE_JSON=$(jq -n --arg name "$NODE_NAME_RAW" --arg error "Sing-box failed to start" '{name: $name, status: "error", error: $error, timestamp: (now | strftime("%Y-%m-%dT%H:%M:%SZ"))}')
+                RESULTS_JSON_ARRAY=$(echo "$RESULTS_JSON_ARRAY" | jq --argjson item "$CURRENT_NODE_JSON" '. + [$item]')
+                rm -f "$TEMP_SINGBOX_CONFIG"
+                continue
+            fi
+            echo "Sing-box started with PID $SINGBOX_PID for $NODE_ID."
+
+            PROXY_ADDRESS="socks5h://127.0.0.1:10808"
+
+            echo "Testing IP for $NODE_ID..."
+            IP_INFO_RAW=$(curl -s --connect-timeout 10 --max-time 15 --proxy "$PROXY_ADDRESS" "https://ip.oxylabs.io/location")
+            
+            IP_ADDRESS=$(echo "$IP_INFO_RAW" | jq -r '.ip // "N/A"')
+            COUNTRY=$(echo "$IP_INFO_RAW" | jq -r '.providers.dbip.country // .providers.ip2location.country // .providers.ipinfo.country // .providers.maxmind.country // "N/A"')
+            CITY=$(echo "$IP_INFO_RAW" | jq -r '.providers.dbip.city // .providers.ip2location.city // .providers.ipinfo.city // .providers.maxmind.city // "N/A"')
+            ASN_ORG=$(echo "$IP_INFO_RAW" | jq -r '.providers.dbip.org_name // .providers.ip2location.org_name // .providers.ipinfo.org_name // .providers.maxmind.org_name // "N/A"')
+            ASN_NUMBER=$(echo "$IP_INFO_RAW" | jq -r '.providers.dbip.asn // .providers.ip2location.asn // .providers.ipinfo.asn // .providers.maxmind.asn // "N/A"')
+
+            echo "Running speedtest for $NODE_ID..."
+            SPEEDTEST_RESULT_RAW=$(speedtest-cli --proxy "$PROXY_ADDRESS" --simple --timeout 35) || SPEEDTEST_RESULT_RAW="Ping: N/A ms Download: N/A Mbit/s Upload: N/A Mbit/s"
+
+            PING=$(echo "$SPEEDTEST_RESULT_RAW" | grep -oP 'Ping: \K[0-9.]+(?= ms)' || echo "N/A")
+            DOWNLOAD_SPEED=$(echo "$SPEEDTEST_RESULT_RAW" | grep -oP 'Download: \K[0-9.]+(?= Mbit/s)' || echo "N/A")
+            UPLOAD_SPEED=$(echo "$SPEEDTEST_RESULT_RAW" | grep -oP 'Upload: \K[0-9.]+(?= Mbit/s)' || echo "N/A")
+
+            echo "Stopping Sing-box for $NODE_ID (PID $SINGBOX_PID)..."
+            kill -SIGTERM $SINGBOX_PID || echo "Failed to send SIGTERM"
+            if ps -p $SINGBOX_PID > /dev/null; then
+                sleep 3
+                if ps -p $SINGBOX_PID > /dev/null; then kill -SIGKILL $SINGBOX_PID || echo "Failed to send SIGKILL"; fi
+            fi
+            wait $SINGBOX_PID 2>/dev/null
+            echo "Sing-box stopped for $NODE_ID."
+
+            CURRENT_NODE_JSON=$(jq -n \
+              --arg name "$NODE_NAME_RAW" \
+              --arg ip "$IP_ADDRESS" \
+              --arg country "$COUNTRY" \
+              --arg city "$CITY" \
+              --arg asn_org "$ASN_ORG" \
+              --arg asn_number "$ASN_NUMBER" \
+              --arg ping "$PING" \
+              --arg download "$DOWNLOAD_SPEED" \
+              --arg upload "$UPLOAD_SPEED" \
+              '{name: $name, ip_address: $ip, country_code: $country, city: $city, asn_organization: $asn_org, asn_number: $asn_number, ping_ms: $ping, download_mbps: $download, upload_mbps: $upload, status: "tested", timestamp: (now | strftime("%Y-%m-%dT%H:%M:%SZ"))}')
+            
+            RESULTS_JSON_ARRAY=$(echo "$RESULTS_JSON_ARRAY" | jq --argjson item "$CURRENT_NODE_JSON" '. + [$item]')
+            rm -f "$TEMP_SINGBOX_CONFIG"
+            echo "------------------------------------"
+          done
+
+          echo "$RESULTS_JSON_ARRAY" > proxy_results.json
+          echo "All nodes processed. Results saved to proxy_results.json"
+
+          echo "Stopping subconverter..."
+          pkill subconverter || echo "Subconverter not running or already stopped."
+
+      - name: Commit results
+        run: |
+          git config --global user.name 'GitHub Actions Bot'
+          git config --global user.email 'github-actions-bot@users.noreply.github.com'
+          git add proxy_results.json
+          if ! git diff --staged --quiet; then
+            git commit -m "Update proxy test results ($(date -u +'%Y-%m-%d %H:%M:%S UTC'))"
+            git push
+          else
+            echo "No changes to proxy results."
+          fi
