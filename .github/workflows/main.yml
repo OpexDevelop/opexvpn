@@ -28,7 +28,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y curl jq speedtest-cli yq
 
-      - name: Download, install, and run subconverter
+      - name: Download and prepare subconverter
+        id: prepare_subconverter
         run: |
           SUBVERTER_VERSION="v0.9.0"
           echo "Downloading subconverter..."
@@ -37,7 +38,7 @@ jobs:
           echo "Removing any pre-existing 'subconverter' file or directory to ensure clean extraction..."
           rm -rf ./subconverter ./subconverter_linux64 
           
-          echo "Extracting subconverter (output will show extracted files)..."
+          echo "Extracting subconverter..."
           tar -xvf subconverter_linux64.tar.gz
           
           ACTUAL_SUBCONVERTER_BINARY="./subconverter/subconverter" 
@@ -70,10 +71,14 @@ jobs:
           # log_level = debug
           EOF
           echo "pref.ini created in current directory (workspace root)."
+          echo "subconverter_binary_path=$ACTUAL_SUBCONVERTER_BINARY" >> $GITHUB_OUTPUT
 
-          echo "Starting subconverter in background..."
+      - name: Start and health check subconverter
+        run: |
+          ACTUAL_SUBCONVERTER_BINARY="${{ steps.prepare_subconverter.outputs.subconverter_binary_path }}"
+          echo "Starting subconverter ($ACTUAL_SUBCONVERTER_BINARY) in background..."
           nohup "$ACTUAL_SUBCONVERTER_BINARY" > subconverter.log 2>&1 &
-          SUBCONVERTER_PID=$! 
+          SUBCONVERTER_PID=$!
           echo "Subconverter PID: $SUBCONVERTER_PID"
           
           sleep 8 
