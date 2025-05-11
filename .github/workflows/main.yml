@@ -17,11 +17,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # Мы будем делать push, а потом использовать этот же checkout,
-          # поэтому важно, чтобы он был актуальным.
-          # Можно добавить ref: ${{ github.sha }} для большей точности,
-          # но обычно checkout@v4 и так берет последний коммит.
-          persist-credentials: false # Чтобы следующий git push не конфликтовал
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -50,8 +46,6 @@ jobs:
           base64 -w 0 original_sub_content.tmp > "$ENCODED_FILE_NAME"
           rm original_sub_content.tmp
           echo "Encoded content saved to $ENCODED_FILE_NAME"
-
-          # Устанавливаем output с именем файла для использования в следующих шагах
           echo "encoded_file_name=$ENCODED_FILE_NAME" >> $GITHUB_OUTPUT
 
           git config --global user.name 'GitHub Actions Bot'
@@ -60,11 +54,10 @@ jobs:
           if ! git diff --staged --quiet; then
             echo "Changes detected in $ENCODED_FILE_NAME. Committing and pushing..."
             git commit -m "Update $ENCODED_FILE_NAME from Gist"
-            # Делаем push и ждем немного, чтобы GitHub успел обработать
             git push origin main 
             echo "$ENCODED_FILE_NAME updated and pushed to repository."
             echo "Waiting a few seconds for GitHub to process the push..."
-            sleep 15 # Пауза, чтобы файл стал доступен по raw URL
+            sleep 15 
           else
             echo "No changes to $ENCODED_FILE_NAME from Gist. No push needed for this file."
           fi
@@ -141,27 +134,16 @@ jobs:
       - name: Fetch and process subscription from REPO file URL
         id: process_nodes
         env:
-          # Формируем URL к raw файлу в репозитории
-          # ${{ github.repository }} дает "OpexDevelop/opexvpn"
-          # ${{ github.ref_name }} дает имя текущей ветки, например "main"
           REPO_FILE_URL: "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.ref_name }}/${{ steps.update_encoded_file.outputs.encoded_file_name }}"
         run: |
-          # URL к файлу в репозитории, который был обновлен на предыдущем шаге
-          # Важно: этот URL будет указывать на версию файла, которая была в репозитории ПОСЛЕ PUSH'а
-          # из шага update_encoded_file, благодаря паузе sleep.
           SUBSCRIPTION_URL_FROM_REPO_RAW="$REPO_FILE_URL"
           
           echo "Using subscription URL from repository: $SUBSCRIPTION_URL_FROM_REPO_RAW"
-
-          # URL-кодируем этот URL для передачи в subconverter
-          # И добавляем параметр base64=true, чтобы subconverter знал, что содержимое файла - это base64
           SUBSCRIPTION_URL_ENCODED=$(echo -n "$SUBSCRIPTION_URL_FROM_REPO_RAW" | jq -sRr @uri)
           
-          # Проверяем доступность URL перед передачей в subconverter
           echo "Checking accessibility of $SUBSCRIPTION_URL_FROM_REPO_RAW..."
           if ! curl --output /dev/null --silent --head --fail "$SUBSCRIPTION_URL_FROM_REPO_RAW"; then
             echo "Failed to access $SUBSCRIPTION_URL_FROM_REPO_RAW. It might not be available yet after push."
-            # Можно добавить еще одну короткую паузу и повторную попытку, если это частая проблема
             sleep 5
             if ! curl --output /dev/null --silent --head --fail "$SUBSCRIPTION_URL_FROM_REPO_RAW"; then
                 echo "Still failed to access $SUBSCRIPTION_URL_FROM_REPO_RAW after retry. Exiting."
@@ -173,7 +155,6 @@ jobs:
           fi
           
           echo "Fetching and converting subscription (from repo file URL, content is base64) to Clash format..."
-          # Передаем URL на файл в репо и указываем, что его содержимое - base64
           if ! curl --fail -sL "http://127.0.0.1:25500/sub?target=clash&url=${SUBSCRIPTION_URL_ENCODED}&base64=true" -o sub_clash_config.yaml; then
             CURL_EXIT_CODE_SUB=$?
             echo "Curl command failed to get subscription from subconverter. Exit code: $CURL_EXIT_CODE_SUB"
@@ -191,7 +172,7 @@ jobs:
 
           RESULTS_JSON_ARRAY="[]"
           
-          PROXY_COUNT=$(yq '.proxies | length' sub_clash_config.yaml)
+          PROXY_COUNT=$(yq eval '.proxies | length' sub_clash_config.yaml) # ИСПРАВЛЕНО yq eval
           if [ -z "$PROXY_COUNT" ] || [ "$PROXY_COUNT" -eq 0 ]; then
             echo "No proxies found in the converted Clash config."
             cat sub_clash_config.yaml
@@ -201,7 +182,8 @@ jobs:
           echo "Found $PROXY_COUNT proxies to test."
 
           for i in $(seq 0 $((PROXY_COUNT - 1))); do
-            CLASH_NODE_JSON=$(yq ".proxies[$i]" -o=json sub_clash_config.yaml)
+            # ИСПРАВЛЕНА КОМАНДА yq
+            CLASH_NODE_JSON=$(yq eval ".proxies[$i]" -o json sub_clash_config.yaml)
 
             if [ -z "$CLASH_NODE_JSON" ] || [ "$CLASH_NODE_JSON" == "null" ]; then
                 echo "Failed to extract proxy node $i. Skipping."
@@ -288,8 +270,6 @@ jobs:
         run: |
           git config --global user.name 'GitHub Actions Bot'
           git config --global user.email 'github-actions-bot@users.noreply.github.com'
-          # encoded_subscription.txt уже должен быть закоммичен на шаге update_encoded_file, если изменился.
-          # Здесь коммитим только proxy_results.json, если он изменился.
           git add proxy_results.json 
           if ! git diff --staged --quiet; then
             git commit -m "Update proxy test results ($(date -u +'%Y-%m-%d %H:%M:%S UTC'))"
