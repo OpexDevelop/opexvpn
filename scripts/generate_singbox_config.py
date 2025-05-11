@@ -4,7 +4,13 @@ import sys
 from urllib.parse import unquote
 
 def clash_to_singbox_outbound(clash_node, node_id_tag_suffix):
-    singbox_outbound = {"tag": clash_node.get("name", node_id_tag_suffix)} 
+    # Use a sanitized version of the node name for the tag, or fallback to suffix
+    raw_name = clash_node.get("name", "")
+    sanitized_name = ''.join(char for char in raw_name if char.isalnum() or char in [' ', '_', '-', '.'])
+    sanitized_name = sanitized_name.strip()
+    tag_name = sanitized_name if sanitized_name else node_id_tag_suffix
+    
+    singbox_outbound = {"tag": tag_name}
     node_type = clash_node.get("type")
 
     if not clash_node.get("server") or clash_node.get("port") is None:
@@ -28,50 +34,55 @@ def clash_to_singbox_outbound(clash_node, node_id_tag_suffix):
             print(f"Error: SS Node '{clash_node.get('name')}' is missing method or password.", file=sys.stderr)
             return None
         
-        if clash_node.get("plugin"):
-            singbox_outbound["plugin"] = clash_node.get("plugin")
-            if clash_node.get("plugin-opts"):
-                opts = clash_node.get("plugin-opts")
-                if isinstance(opts, dict):
-                    if opts.get("mode") == "websocket" and singbox_outbound.get("plugin") == "v2ray-plugin":
-                         plugin_opts_str = f"tls={str(opts.get('tls', False)).lower()};"
-                         plugin_opts_str += f"host={opts.get('host', '')};"
-                         plugin_opts_str += f"path={opts.get('path', '/')};"
-                         plugin_opts_str += f"mux={str(opts.get('mux', False)).lower()};"
-                         plugin_opts_str += f"mode=websocket;"
-                         if opts.get('skip-cert-verify'):
-                             plugin_opts_str += "skip-cert-verify=true;"
-                         singbox_outbound["plugin_opts"] = plugin_opts_str.strip(';')
-                    elif singbox_outbound.get("plugin") == "obfs":
-                        plugin_opts_str = f"obfs={opts.get('obfs')};obfs-host={opts.get('obfs-host', 'www.bing.com')}"
-                        singbox_outbound["plugin_opts"] = plugin_opts_str
-                    else:
-                        singbox_outbound["plugin_opts"] = str(opts) if not isinstance(opts, str) else opts
-                else:
-                    singbox_outbound["plugin_opts"] = opts
+        plugin = clash_node.get("plugin")
+        plugin_opts = clash_node.get("plugin-opts")
+
+        if plugin and plugin_opts:
+            if plugin == "v2ray-plugin" and isinstance(plugin_opts, dict) and plugin_opts.get("mode") == "websocket":
+                transport_settings = {"type": "ws"}
+                ws_opts_path = plugin_opts.get("path", "/")
+                ws_opts_host = plugin_opts.get("host", "") 
+                
+                transport_settings["path"] = ws_opts_path
+                if ws_opts_host:
+                    transport_settings["headers"] = {"Host": ws_opts_host}
+                
+                singbox_outbound["transport"] = transport_settings
+
+                if plugin_opts.get("tls", False):
+                    tls_settings = {
+                        "enabled": True,
+                        "server_name": plugin_opts.get("host", singbox_outbound["server"]), 
+                        "insecure": plugin_opts.get("skip-cert-verify", False)
+                    }
+                    singbox_outbound["tls"] = tls_settings
+            elif plugin == "obfs" and isinstance(plugin_opts, dict):
+                 print(f"Warning: SS Node '{clash_node.get('name')}' uses obfs plugin '{plugin_opts.get('obfs')}'. Direct translation to sing-box SS outbound might be limited.", file=sys.stderr)
+
 
     elif node_type == "vless" or node_type == "vmess":
         singbox_outbound["type"] = node_type
         singbox_outbound["uuid"] = clash_node.get("uuid")
         if not singbox_outbound.get("uuid"):
-            print(f"Error: VLESS/VMess Node '{clash_node.get('name')}' is missing uuid.", file=sys.stderr)
+            print(f"Error: {node_type.upper()} Node '{clash_node.get('name')}' is missing uuid.", file=sys.stderr)
             return None
 
         if node_type == "vmess":
             singbox_outbound["alter_id"] = clash_node.get("alterId", 0) 
-            singbox_outbound["security"] = clash_node.get("cipher", "auto") 
+            singbox_outbound["security"] = clash_node.get("cipher", "auto")
+        elif node_type == "vless":
+            flow_value = clash_node.get("flow", "")
+            if flow_value: 
+                 singbox_outbound["flow"] = flow_value
         
-        singbox_outbound["flow"] = clash_node.get("flow", "") 
-
         tls_enabled_clash = clash_node.get("tls", False)
         
-        if tls_enabled_clash:
-            sni_candidate = clash_node.get("sni", clash_node.get("serverName"))
-            if not sni_candidate and isinstance(tls_enabled_clash, dict):
-                sni_candidate = tls_enabled_clash.get("serverName")
+        if tls_enabled_clash: 
+            sni_candidate = clash_node.get("sni", clash_node.get("serverName")) 
+            if not sni_candidate and isinstance(clash_node.get("ws-opts"), dict): 
+                sni_candidate = clash_node.get("ws-opts", {}).get("headers", {}).get("Host")
             
             final_sni = sni_candidate if sni_candidate else singbox_outbound["server"]
-
             skip_verify = clash_node.get("skip-cert-verify", False)
             if isinstance(tls_enabled_clash, dict) and "skip-cert-verify" in tls_enabled_clash:
                 skip_verify = tls_enabled_clash.get("skip-cert-verify")
@@ -82,17 +93,19 @@ def clash_to_singbox_outbound(clash_node, node_id_tag_suffix):
                 "insecure": skip_verify
             }
             
-            client_fp = clash_node.get("client-fingerprint")
-            if client_fp:
+            client_fp = clash_node.get("client-fingerprint") 
+            if client_fp: 
                 tls_settings["utls"] = {"enabled": True, "fingerprint": client_fp}
             
-            reality_opts = clash_node.get("reality-opts")
-            if reality_opts and reality_opts.get("public-key"):
+            reality_opts = clash_node.get("reality-opts") 
+            if reality_opts and isinstance(reality_opts, dict) and reality_opts.get("public-key"):
                  tls_settings["reality"] = {
                     "enabled": True,
                     "public_key": reality_opts["public-key"],
-                    "short_id": reality_opts.get("short-id", "")
                  }
+                 if "short-id" in reality_opts: 
+                     tls_settings["reality"]["short_id"] = reality_opts.get("short-id", "")
+
             singbox_outbound["tls"] = tls_settings
         
         network = clash_node.get("network")
@@ -101,13 +114,16 @@ def clash_to_singbox_outbound(clash_node, node_id_tag_suffix):
             if network == "ws":
                 ws_opts = clash_node.get("ws-opts", {})
                 transport_settings["path"] = ws_opts.get("path", "/")
-                headers = ws_opts.get("headers", {})
                 
-                host_header_candidate = headers.get("Host", ws_opts.get("host", clash_node.get("host")))
-                if host_header_candidate:
-                    headers["Host"] = host_header_candidate
+                headers = ws_opts.get("headers", {}) 
+                host_header_val = headers.get("Host", headers.get("host")) 
+                if not host_header_val: 
+                    host_header_val = ws_opts.get("host")
+
+                if host_header_val:
+                    headers["Host"] = host_header_val 
                 elif singbox_outbound.get("tls", {}).get("enabled") and singbox_outbound.get("tls", {}).get("server_name"):
-                     headers["Host"] = singbox_outbound["tls"]["server_name"]
+                     headers["Host"] = singbox_outbound["tls"]["server_name"] 
                 elif singbox_outbound.get("server"): 
                      headers["Host"] = singbox_outbound["server"]
                 
@@ -128,89 +144,115 @@ def clash_to_singbox_outbound(clash_node, node_id_tag_suffix):
             print(f"Error: Trojan Node '{clash_node.get('name')}' is missing password.", file=sys.stderr)
             return None
         
-        print(f"DEBUG: Trojan password RAW for '{clash_node.get('name')}': '{password_raw}'", file=sys.stderr)
         password_unquoted = unquote(password_raw)
-        print(f"DEBUG: Trojan password UNQUOTED for '{clash_node.get('name')}': '{password_unquoted}'", file=sys.stderr)
         singbox_outbound["password"] = password_unquoted
         
         final_sni = clash_node.get("sni", singbox_outbound["server"])
-        skip_verify = clash_node.get("skip-cert-verify", False)
+        # skip_verify = clash_node.get("skip-cert-verify", False) # Старая логика
 
-        singbox_outbound["tls"] = { 
+        tls_settings = {
             "enabled": True, 
             "server_name": final_sni,
-            "insecure": skip_verify
+            "insecure": True  # <--- ИЗМЕНЕНИЕ: Всегда true для Trojan
         }
-        if clash_node.get("alpn"):
-            singbox_outbound["tls"]["alpn"] = clash_node.get("alpn")
+        if clash_node.get("alpn"): 
+            tls_settings["alpn"] = clash_node.get("alpn")
+        
+        singbox_outbound["tls"] = tls_settings 
 
         network = clash_node.get("network") 
-        if network == "ws": 
-            ws_opts = clash_node.get("ws-opts", {})
-            transport_settings = {
-                "type": "ws",
-                "path": ws_opts.get("path", "/"),
-            }
-            headers = ws_opts.get("headers", {})
-            host_header_candidate = headers.get("Host", ws_opts.get("host", clash_node.get("host")))
-            if host_header_candidate:
-                headers["Host"] = host_header_candidate
-            elif final_sni: 
-                 headers["Host"] = final_sni
+        if network:
+            transport_settings = {"type": network}
+            if network == "ws":
+                ws_opts = clash_node.get("ws-opts", {})
+                transport_settings["path"] = ws_opts.get("path", "/")
+                headers = ws_opts.get("headers", {})
+                host_header_val = headers.get("Host", headers.get("host", ws_opts.get("host")))
+                
+                if host_header_val:
+                    headers["Host"] = host_header_val
+                elif final_sni: 
+                     headers["Host"] = final_sni
+                
+                if headers:
+                    transport_settings["headers"] = headers
             
-            if headers:
-                transport_settings["headers"] = headers
-            singbox_outbound["transport"] = transport_settings
+            if transport_settings: # Проверка, что transport_settings не пустой
+                singbox_outbound["transport"] = transport_settings
     
     elif node_type == "hysteria2" or node_type == "hy2":
         singbox_outbound["type"] = "hysteria2"
-        singbox_outbound["auth_str"] = clash_node.get("password") 
-        if not singbox_outbound.get("auth_str"):
+        auth_str = clash_node.get("password") 
+        if not auth_str:
             print(f"Error: Hysteria2 Node '{clash_node.get('name')}' is missing password/auth_str.", file=sys.stderr)
             return None
+        singbox_outbound["auth_str"] = auth_str 
 
-        singbox_outbound["tls"] = {
-            "enabled": True, 
+        tls_settings = {
+            "enabled": True,
             "server_name": clash_node.get("sni", singbox_outbound["server"]),
-            "insecure": clash_node.get("skip-cert-verify", False)
+            "insecure": clash_node.get("skip-cert-verify", False) # Для Hysteria2 оставляем зависимость от skip-cert-verify
         }
         if clash_node.get("alpn"):
-             singbox_outbound["tls"]["alpn"] = clash_node.get("alpn")
+             tls_settings["alpn"] = clash_node.get("alpn")
+        client_fp = clash_node.get("client-fingerprint")
+        if client_fp:
+            tls_settings["utls"] = {"enabled": True, "fingerprint": client_fp}
+
+        singbox_outbound["tls"] = tls_settings
         
-        if clash_node.get("obfs") and clash_node.get("obfs-password"): 
-            singbox_outbound["obfs"] = { 
+        if clash_node.get("obfs") and clash_node.get("obfs-password"):
+            singbox_outbound["obfs"] = {
                 "type": clash_node.get("obfs"), 
                 "password": clash_node.get("obfs-password")
             }
+        
         if clash_node.get("up_mbps") is not None:
-            singbox_outbound["up_mbps"] = int(clash_node.get("up_mbps"))
+            try:
+                singbox_outbound["up_mbps"] = int(clash_node.get("up_mbps"))
+            except ValueError:
+                 print(f"Warning: Hysteria2 Node '{clash_node.get('name')}' has invalid up_mbps.", file=sys.stderr)
         if clash_node.get("down_mbps") is not None:
-            singbox_outbound["down_mbps"] = int(clash_node.get("down_mbps"))
+            try:
+                singbox_outbound["down_mbps"] = int(clash_node.get("down_mbps"))
+            except ValueError:
+                print(f"Warning: Hysteria2 Node '{clash_node.get('name')}' has invalid down_mbps.", file=sys.stderr)
 
-    elif node_type == "tuic":
+
+    elif node_type == "tuic": 
         singbox_outbound["type"] = "tuic"
-        singbox_outbound["uuid"] = clash_node.get("uuid") 
-        singbox_outbound["password"] = clash_node.get("password") 
+        singbox_outbound["uuid"] = clash_node.get("uuid")
+        singbox_outbound["password"] = clash_node.get("password")
         if not all([singbox_outbound.get("uuid"), singbox_outbound.get("password")]):
              print(f"Error: TUIC Node '{clash_node.get('name')}' is missing uuid or password.", file=sys.stderr)
              return None
         
-        singbox_outbound["tls"] = { 
+        tls_settings = {
             "enabled": True,
             "server_name": clash_node.get("sni", singbox_outbound["server"]),
-            "insecure": clash_node.get("skip-cert-verify", False),
+            "insecure": clash_node.get("skip-cert-verify", False), # Для TUIC оставляем зависимость от skip-cert-verify
         }
         if clash_node.get("alpn"): 
-            singbox_outbound["tls"]["alpn"] = clash_node.get("alpn")
+            tls_settings["alpn"] = clash_node.get("alpn")
+        client_fp = clash_node.get("client-fingerprint")
+        if client_fp:
+            tls_settings["utls"] = {"enabled": True, "fingerprint": client_fp}
+        
+        singbox_outbound["tls"] = tls_settings
         
         if clash_node.get("congestion-control"):
             singbox_outbound["congestion_control"] = clash_node.get("congestion-control")
         if clash_node.get("udp-relay-mode"): 
             singbox_outbound["udp_relay_mode"] = clash_node.get("udp-relay-mode")
+        
         if "heartbeat-interval" in clash_node: 
-            singbox_outbound["heartbeat_interval"] = clash_node.get("heartbeat-interval") 
+            try:
+                singbox_outbound["heartbeat_interval"] = f"{int(clash_node.get('heartbeat-interval'))}s"
+            except ValueError:
+                print(f"Warning: TUIC Node '{clash_node.get('name')}' has invalid heartbeat-interval.", file=sys.stderr)
+
         if "reduce-rtt" in clash_node: 
-            singbox_outbound["reduce_rtt"] = clash_node.get("reduce-rtt") 
+            singbox_outbound["reduce_rtt"] = clash_node.get("reduce-rtt")
     
     else:
         print(f"Unsupported Clash node type: {node_type} for node {clash_node.get('name')}", file=sys.stderr)
@@ -232,12 +274,19 @@ def generate_full_singbox_config(singbox_outbound_node):
                 "type": "socks",
                 "tag": "socks-in",
                 "listen": "127.0.0.1",
-                "listen_port": 10808
+                "listen_port": 10808, 
+                "sniff": True, 
+                "sniff_override_destination": False
             }
         ],
         "outbounds": [singbox_outbound_node],
         "route": {
-            "rules": [{"inbound": ["socks-in"], "outbound": singbox_outbound_node["tag"]}]
+            "rules": [
+                {
+                    "inbound": ["socks-in"], 
+                    "outbound": singbox_outbound_node["tag"]
+                }
+            ],
         }
     }
     return json.dumps(config, indent=2)
@@ -247,7 +296,7 @@ if __name__ == "__main__":
         print("Usage: cat clash_node.json | python generate_singbox_config.py <NODE_ID_SUFFIX_FOR_TAG>", file=sys.stderr)
         sys.exit(1)
 
-    node_id_suffix_for_tag = sys.argv[1]
+    node_id_suffix_for_tag = sys.argv[1] 
     
     try:
         clash_node_data = json.load(sys.stdin)
@@ -262,7 +311,7 @@ if __name__ == "__main__":
         if full_config_json:
             print(full_config_json)
         else:
-            print(f"Error: Failed to generate full sing-box config even though outbound was created.", file=sys.stderr)
+            print(f"Error: Failed to generate full sing-box config for node '{clash_node_data.get('name')}'.", file=sys.stderr)
             sys.exit(1) 
     else:
         sys.exit(1)
