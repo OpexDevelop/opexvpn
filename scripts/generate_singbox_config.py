@@ -60,9 +60,9 @@ def clash_to_singbox_outbound(clash_node, node_id_tag_suffix):
         if node_type == "vmess":
             singbox_outbound["alter_id"] = clash_node.get("alterId", 0) 
             singbox_outbound["security"] = clash_node.get("cipher", "auto") 
-        elif node_type == "vless": # flow только для VLESS
+        elif node_type == "vless": # Flow только для VLESS
             singbox_outbound["flow"] = clash_node.get("flow", "") 
-        
+
         tls_enabled_clash = clash_node.get("tls", False)
         
         if tls_enabled_clash:
@@ -128,7 +128,10 @@ def clash_to_singbox_outbound(clash_node, node_id_tag_suffix):
             print(f"Error: Trojan Node '{clash_node.get('name')}' is missing password.", file=sys.stderr)
             return None
         
-        singbox_outbound["password"] = unquote(password_raw)
+        print(f"DEBUG: Trojan password RAW for '{clash_node.get('name')}': '{password_raw}'", file=sys.stderr)
+        password_unquoted = unquote(password_raw)
+        print(f"DEBUG: Trojan password UNQUOTED for '{clash_node.get('name')}': '{password_unquoted}'", file=sys.stderr)
+        singbox_outbound["password"] = password_unquoted
         
         final_sni = clash_node.get("sni", singbox_outbound["server"])
         skip_verify = clash_node.get("skip-cert-verify", False)

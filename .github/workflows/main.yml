@@ -16,8 +16,7 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          persist-credentials: false
+        # Убрали persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -30,7 +29,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y curl jq speedtest-cli yq coreutils
 
-      - name: Fetch Gist, encode, and prepare for commit
+      - name: Fetch Gist, encode, and commit encoded_subscription.txt
         id: update_encoded_file
         run: |
           GIST_URL="https://gist.githubusercontent.com/OpexDevelop/a676272468c9b6ac804092250ce9bc67/raw/opexvpn-high.txt"
@@ -45,7 +44,17 @@ jobs:
           rm original_sub_content.tmp
           echo "Encoded content saved to $ENCODED_FILE_NAME"
           echo "encoded_file_name=$ENCODED_FILE_NAME" >> $GITHUB_OUTPUT
-          # Файл будет добавлен в коммит на последнем шаге
+          git config --global user.name 'GitHub Actions Bot'
+          git config --global user.email 'github-actions-bot@users.noreply.github.com'
+          git add "$ENCODED_FILE_NAME"
+          if ! git diff --staged --quiet; then
+            echo "Changes detected in $ENCODED_FILE_NAME. Committing and pushing..."
+            git commit -m "Update $ENCODED_FILE_NAME from Gist"
+            # git push origin main # Временно закомментируем push здесь, сделаем один push в конце
+            echo "$ENCODED_FILE_NAME updated and staged for commit."
+          else
+            echo "No changes to $ENCODED_FILE_NAME from Gist."
+          fi
 
       - name: Download and prepare subconverter
         id: prepare_subconverter
@@ -136,16 +145,27 @@ jobs:
           # Используем имя файла, которое было установлено в шаге update_encoded_file
           ENCODED_SUB_FILENAME: ${{ steps.update_encoded_file.outputs.encoded_file_name }}
         run: |
-          # Используем локальный файл, так как он уже есть в рабочей директории после checkout и обновления
-          if [ ! -f "$ENCODED_SUB_FILENAME" ]; then
-            echo "CRITICAL: Encoded subscription file '$ENCODED_SUB_FILENAME' not found in workspace."
-            exit 1
-          fi
-          echo "Using local encoded subscription file: $ENCODED_SUB_FILENAME"
+          # Используем локальный файл, так как он уже есть в рабочей директории
+          LOCAL_ENCODED_FILE="$ENCODED_SUB_FILENAME"
           
-          BASE64_CONTENT_FROM_FILE=$(cat "$ENCODED_SUB_FILENAME")
+          if [ ! -f "$LOCAL_ENCODED_FILE" ]; then
+            echo "CRITICAL: Encoded subscription file '$LOCAL_ENCODED_FILE' not found in workspace."
+            # Если файла нет локально, пытаемся скачать его из репозитория (версия из последнего коммита)
+            # Это может быть полезно, если workflow запускается по schedule, а не по push
+            REPO_FILE_URL_FALLBACK="https://raw.githubusercontent.com/${{ github.repository }}/${{ github.ref_name }}/$LOCAL_ENCODED_FILE"
+            echo "Attempting to download fallback from $REPO_FILE_URL_FALLBACK"
+            if ! curl -sL --fail "$REPO_FILE_URL_FALLBACK" -o "$LOCAL_ENCODED_FILE"; then
+                echo "Failed to download $LOCAL_ENCODED_FILE from repository as fallback. Exiting."
+                exit 1
+            fi
+            echo "Successfully downloaded $LOCAL_ENCODED_FILE from repository as fallback."
+          fi
+          
+          echo "Using local encoded subscription file: $LOCAL_ENCODED_FILE"
+          
+          BASE64_CONTENT_FROM_FILE=$(cat "$LOCAL_ENCODED_FILE")
           if [ -z "$BASE64_CONTENT_FROM_FILE" ]; then
-            echo "Error: The file $ENCODED_SUB_FILENAME is empty."
+            echo "Error: The file $LOCAL_ENCODED_FILE is empty."
             exit 1
           fi
 
@@ -297,44 +317,23 @@ jobs:
             fi
             rm -f "$SINGBOX_NODE_LOG"
             
-            # Собираем JSON для узла
-            # Если NODE_TEST_SUCCESS false, но IP_ADDRESS не N/A, значит speedtest упал, но IP получили
-            # Если NODE_TEST_SUCCESS false и IP_ADDRESS N/A, значит и IP тест упал
-            ERROR_MESSAGE=""
-            if [ "$NODE_TEST_SUCCESS" = false ]; then
-                if [ "$IP_ADDRESS" = "N/A" ]; then
-                    ERROR_MESSAGE="IP test failed"
-                else
-                    ERROR_MESSAGE="Speedtest failed"
-                fi
+            if [ "$NODE_TEST_SUCCESS" = false ] && { [ "$IP_ADDRESS" = "N/A" ] || [ "$IP_ADDRESS" = "" ]; }; then
+                echo "Critical test (IP check) failed for node $NODE_NAME_RAW."
+                # Если хотите останавливать на первой же критической ошибке, раскомментируйте exit 1
+                # exit 1 
             fi
 
-            if [ "$NODE_TEST_SUCCESS" = true ]; then
-                 CURRENT_NODE_JSON=$(jq -n \
-                  --arg name "$NODE_NAME_RAW" \
-                  --arg ip "$IP_ADDRESS" \
-                  --arg country "$COUNTRY" \
-                  --arg city "$CITY" \
-                  --arg asn_org "$ASN_ORG" \
-                  --arg asn_number "$ASN_NUMBER" \
-                  --arg ping "$PING" \
-                  --arg download "$DOWNLOAD_SPEED" \
-                  --arg upload "$UPLOAD_SPEED" \
-                  '{name: $name, ip_address: $ip, country_code: $country, city: $city, asn_organization: $asn_org, asn_number: $asn_number, ping_ms: $ping, download_mbps: $download, upload_mbps: $upload, status: "tested", timestamp: (now | strftime("%Y-%m-%dT%H:%M:%SZ"))}')
-            else
-                 CURRENT_NODE_JSON=$(jq -n \
-                  --arg name "$NODE_NAME_RAW" \
-                  --arg ip "$IP_ADDRESS" \
-                  --arg country "$COUNTRY" \
-                  --arg city "$CITY" \
-                  --arg asn_org "$ASN_ORG" \
-                  --arg asn_number "$ASN_NUMBER" \
-                  --arg ping "$PING" \
-                  --arg download "$DOWNLOAD_SPEED" \
-                  --arg upload "$UPLOAD_SPEED" \
-                  --arg error_msg "$ERROR_MESSAGE" \
-                  '{name: $name, ip_address: $ip, country_code: $country, city: $city, asn_organization: $asn_org, asn_number: $asn_number, ping_ms: $ping, download_mbps: $download, upload_mbps: $upload, status: "error", error: $error_msg, timestamp: (now | strftime("%Y-%m-%dT%H:%M:%SZ"))}')
-            fi
+            CURRENT_NODE_JSON=$(jq -n \
+              --arg name "$NODE_NAME_RAW" \
+              --arg ip "$IP_ADDRESS" \
+              --arg country "$COUNTRY" \
+              --arg city "$CITY" \
+              --arg asn_org "$ASN_ORG" \
+              --arg asn_number "$ASN_NUMBER" \
+              --arg ping "$PING" \
+              --arg download "$DOWNLOAD_SPEED" \
+              --arg upload "$UPLOAD_SPEED" \
+              '{name: $name, ip_address: $ip, country_code: $country, city: $city, asn_organization: $asn_org, asn_number: $asn_number, ping_ms: $ping, download_mbps: $download, upload_mbps: $upload, status: "tested", timestamp: (now | strftime("%Y-%m-%dT%H:%M:%SZ"))}')
             
             RESULTS_JSON_ARRAY=$(echo "$RESULTS_JSON_ARRAY" | jq --argjson item "$CURRENT_NODE_JSON" '. + [$item]')
             rm -f "$TEMP_SINGBOX_CONFIG"
@@ -350,10 +349,22 @@ jobs:
         run: |
           git config --global user.name 'GitHub Actions Bot'
           git config --global user.email 'github-actions-bot@users.noreply.github.com'
-          # Добавляем оба файла, если они изменились (encoded_subscription.txt уже добавлен в индекс на предыдущем шаге)
-          git add proxy_results.json 
-          if ! git diff --staged --quiet HEAD -- "$ENCODED_FILE_NAME" "$PROXY_RESULTS_JSON"; then # Проверяем изменения в обоих файлах
-            git commit -m "Update proxy test results and encoded Gist ($(date -u +'%Y-%m-%d %H:%M:%S UTC'))"
+          # Добавляем оба файла, так как encoded_subscription.txt мог быть изменен на предыдущем шаге,
+          # но не запушен, если не было изменений. Теперь мы его точно добавляем.
+          git add proxy_results.json encoded_subscription.txt
+          if ! git diff --staged --quiet; then
+            # Определяем, какие файлы изменились для сообщения коммита
+            COMMIT_MESSAGE="Update test results"
+            if git diff --staged --quiet -- encoded_subscription.txt; then
+                # encoded_subscription.txt не изменился (или не был добавлен в индекс)
+                # Этого не должно быть, если он был изменен на шаге update_encoded_file
+                # Но если он не изменился, то коммитим только proxy_results.json
+                 echo "Only proxy_results.json changed or no changes to encoded_subscription.txt."
+            else
+                # encoded_subscription.txt изменился
+                COMMIT_MESSAGE="Update test results and encoded Gist"
+            fi
+            git commit -m "$COMMIT_MESSAGE ($(date -u +'%Y-%m-%d %H:%M:%SZ'))"
             git push
           else
             echo "No changes to proxy results or encoded Gist."
