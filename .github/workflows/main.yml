@@ -121,29 +121,16 @@ jobs:
 
       - name: Download and install Sing-box
         run: |
-          SINGBOX_VERSION="1.11.10" # Вы можете обновить до последней стабильной, например 1.9.0 или новее
-          # Для Sing-box v1.9.x и новее, имя архива изменилось
-          # SINGBOX_ARCHIVE_NAME="sing-box-${SINGBOX_VERSION}-linux-amd64" # Для версий до ~1.8.x
-          SINGBOX_ARCHIVE_NAME="sing-box-${SINGBOX_VERSION}-linux-amd64" # Для v1.9.0+ может быть таким или просто singbox-linux-amd64.zip/tar.gz
-                                                                      # Проверьте актуальное имя на странице релизов Sing-box
-          # Пример для v1.9.0 (если имя архива sing-box-1.9.0-linux-amd64.tar.gz)
-          # wget https://github.com/SagerNet/sing-box/releases/download/v${SINGBOX_VERSION}/${SINGBOX_ARCHIVE_NAME}.tar.gz
-          # tar -xzf ${SINGBOX_ARCHIVE_NAME}.tar.gz
-          # sudo mv ./${SINGBOX_ARCHIVE_NAME}/sing-box /usr/local/bin/sing-box
-
-          # Оставляем для v1.11.10, как было, если это актуально для вас
+          SINGBOX_VERSION="1.11.10"
           wget https://github.com/SagerNet/sing-box/releases/download/v${SINGBOX_VERSION}/sing-box-${SINGBOX_VERSION}-linux-amd64.tar.gz
           tar -xzf sing-box-${SINGBOX_VERSION}-linux-amd64.tar.gz
-          # Путь к бинарнику sing-box после распаковки может быть sing-box-${SINGBOX_VERSION}-linux-amd64/sing-box
-          # или просто sing-box, если архив не создает вложенную папку с версией
           if [ -f ./sing-box-${SINGBOX_VERSION}-linux-amd64/sing-box ]; then
             sudo mv ./sing-box-${SINGBOX_VERSION}-linux-amd64/sing-box /usr/local/bin/sing-box
-          elif [ -f ./sing-box ]; then # Если бинарник распаковался в текущую директорию
+          elif [ -f ./sing-box ]; then 
              sudo mv ./sing-box /usr/local/bin/sing-box
           else
             echo "Sing-box binary not found after extraction. Listing files:"
             ls -lah
-            # Попробуем найти его в стандартной папке релиза, если она есть
             RELEASE_DIR_NAME=$(tar -tzf sing-box-${SINGBOX_VERSION}-linux-amd64.tar.gz | head -1 | cut -f1 -d"/")
             if [ -f ./${RELEASE_DIR_NAME}/sing-box ]; then
                 sudo mv ./${RELEASE_DIR_NAME}/sing-box /usr/local/bin/sing-box
@@ -216,6 +203,11 @@ jobs:
 
             echo "Processing Node $((i + 1))/$PROXY_COUNT: $NODE_NAME_RAW (ID: $NODE_ID)"
             TEMP_SINGBOX_CONFIG="temp_singbox_config_${NODE_ID}.json"
+            SINGBOX_NODE_LOG="singbox_node_${NODE_ID}.log" # Имя файла для лога sing-box
+
+            echo "--- Clash Node JSON for $NODE_NAME_RAW ---"
+            yq -r ".proxies[$i] | tojson" sub_clash_config.yaml 
+            echo "----------------------------------------"
 
             yq -r ".proxies[$i] | tojson" sub_clash_config.yaml | python3 scripts/generate_singbox_config.py "$NODE_ID" > "$TEMP_SINGBOX_CONFIG"
 
@@ -224,20 +216,23 @@ jobs:
                 cat "$TEMP_SINGBOX_CONFIG"
                 CURRENT_NODE_JSON=$(jq -n --arg name "$NODE_NAME_RAW" --arg error "Config generation failed" '{name: $name, status: "error", error: $error, timestamp: (now | strftime("%Y-%m-%dT%H:%M:%SZ"))}')
                 RESULTS_JSON_ARRAY=$(echo "$RESULTS_JSON_ARRAY" | jq --argjson item "$CURRENT_NODE_JSON" '. + [$item]')
-                rm -f "$TEMP_SINGBOX_CONFIG"
+                rm -f "$TEMP_SINGBOX_CONFIG" "$SINGBOX_NODE_LOG" # Удаляем и лог, если конфиг не сгенерирован
                 continue
             fi
             
             echo "Starting Sing-box for $NODE_ID..."
-            sing-box run -c "$TEMP_SINGBOX_CONFIG" &
+            sing-box run -c "$TEMP_SINGBOX_CONFIG" > "$SINGBOX_NODE_LOG" 2>&1 &
             SINGBOX_PID=$!
             sleep 8
 
             if ! ps -p $SINGBOX_PID > /dev/null; then
                 echo "Sing-box failed to start for $NODE_ID. PID: $SINGBOX_PID"
+                echo "--- Sing-box Log for $NODE_ID ($SINGBOX_NODE_LOG) ---"
+                cat "$SINGBOX_NODE_LOG"
+                echo "-------------------------------------------------"
                 CURRENT_NODE_JSON=$(jq -n --arg name "$NODE_NAME_RAW" --arg error "Sing-box failed to start" '{name: $name, status: "error", error: $error, timestamp: (now | strftime("%Y-%m-%dT%H:%M:%SZ"))}')
                 RESULTS_JSON_ARRAY=$(echo "$RESULTS_JSON_ARRAY" | jq --argjson item "$CURRENT_NODE_JSON" '. + [$item]')
-                rm -f "$TEMP_SINGBOX_CONFIG"
+                rm -f "$TEMP_SINGBOX_CONFIG" "$SINGBOX_NODE_LOG"
                 continue
             fi
             echo "Sing-box started with PID $SINGBOX_PID for $NODE_ID."
@@ -288,6 +283,13 @@ jobs:
             kill -SIGTERM $SINGBOX_PID || echo "Failed to send SIGTERM to Sing-box"
             wait $SINGBOX_PID 2>/dev/null
             echo "Sing-box stopped for $NODE_ID."
+
+            if [ -s "$SINGBOX_NODE_LOG" ]; then
+                echo "--- Sing-box Log for $NODE_ID ($SINGBOX_NODE_LOG) ---"
+                head -n 50 "$SINGBOX_NODE_LOG" 
+                echo "-------------------------------------------------"
+            fi
+            rm -f "$SINGBOX_NODE_LOG"
 
             CURRENT_NODE_JSON=$(jq -n \
               --arg name "$NODE_NAME_RAW" \
