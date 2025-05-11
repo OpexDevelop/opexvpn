@@ -28,33 +28,33 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y curl jq speedtest-cli yq
 
-      - name: Download and install subconverter
+      - name: Download, install, and run subconverter
         run: |
           SUBVERTER_VERSION="v0.9.0"
+          echo "Downloading subconverter..."
           wget https://github.com/tindy2013/subconverter/releases/download/${SUBVERTER_VERSION}/subconverter_linux64.tar.gz
           
-          echo "Extracting subconverter..."
+          echo "Removing any pre-existing 'subconverter' file or directory to ensure clean extraction..."
+          rm -rf ./subconverter ./subconverter_linux64
+          
+          echo "Extracting subconverter (output will show extracted files)..."
           tar -xvf subconverter_linux64.tar.gz
           
-          if [ ! -f ./subconverter ]; then
-            echo "Subconverter binary not found in current directory after extraction!"
-            if [ -f ./subconverter_linux64/subconverter ]; then
-              echo "Found subconverter in ./subconverter_linux64/"
-              mv ./subconverter_linux64/subconverter ./subconverter
-            else
-              echo "Could not locate subconverter binary. Listing files:"
-              ls -lah
-              exit 1
-            fi
+          ACTUAL_SUBہوںCONVERTER_BINARY="./subconverter/subconverter"
+          
+          if [ ! -f "$ACTUAL_SUBہوںCONVERTER_BINARY" ]; then
+            echo "Subconverter binary not found at $ACTUAL_SUBہوںCONVERTER_BINARY after extraction. Listing current directory contents recursively:"
+            ls -lahR . # Показываем содержимое текущей директории и всех поддиректорий
+            exit 1
           fi
           
-          echo "Making subconverter executable..."
-          chmod +x ./subconverter
+          echo "Making subconverter executable: $ACTUAL_SUBہوںCONVERTER_BINARY"
+          chmod +x "$ACTUAL_SUBہوںCONVERTER_BINARY"
           
-          echo "Subconverter version check from current directory:"
-          ./subconverter -v || echo "Subconverter version check (./subconverter -v) failed."
+          echo "Subconverter version check:"
+          "$ACTUAL_SUBہوںCONVERTER_BINARY" -v || echo "Subconverter version check failed."
           
-          echo "Creating minimal pref.ini for subconverter..."
+          echo "Creating minimal pref.ini for subconverter in current directory..."
           cat <<EOF > pref.ini
           [server]
           listen = 127.0.0.1
@@ -67,13 +67,12 @@ jobs:
           loon_rule_base=
           sssub_rule_base=
           default_external_config=
-          # log_level = info 
+          # log_level = debug
           EOF
-          echo "pref.ini created:"
-          cat pref.ini
+          echo "pref.ini created in current directory (workspace root)."
 
-          echo "Starting subconverter in background (from directory with pref.ini)..."
-          nohup ./subconverter > subconverter.log 2>&1 &
+          echo "Starting subconverter in background..."
+          nohup "$ACTUAL_SUBہوںCONVERTER_BINARY" > subconverter.log 2>&1 &
           SUBCONVERTER_PID=$!
           echo "Subconverter PID: $SUBCONVERTER_PID"
           
@@ -90,7 +89,7 @@ jobs:
 
           echo "Attempting to connect to subconverter for a health check..."
           if curl --connect-timeout 5 -sfS "http://127.0.0.1:25500/sub" > /dev/null; then
-            echo "Subconverter health check: Received unexpected HTTP success (2xx) from /sub without params."
+            echo "Subconverter health check: Received unexpected HTTP success (2xx) from /sub without params (server is up)."
           elif [ $? -eq 22 ]; then 
             echo "Subconverter health check successful (received expected HTTP error from /sub, means server is up)."
           else
@@ -104,7 +103,6 @@ jobs:
             echo "-----------------------------------"
             exit 1
           fi
-          # sudo mv ./subconverter /usr/local/bin/subconverter # Опционально
 
       - name: Download and install Sing-box
         run: |
