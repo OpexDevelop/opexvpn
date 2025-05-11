@@ -26,7 +26,7 @@ jobs:
         run: |
           pip install PyYAML
           sudo apt-get update
-          sudo apt-get install -y curl jq speedtest-cli yq
+          sudo apt-get install -y curl jq speedtest-cli yq coreutils # coreutils для base64 -w 0
 
       - name: Download and prepare subconverter
         id: prepare_subconverter
@@ -123,8 +123,7 @@ jobs:
         id: process_nodes
         run: |
           SUBSCRIPTION_URL_RAW="https://gist.githubusercontent.com/OpexDevelop/a676272468c9b6ac804092250ce9bc67/raw/opexvpn-high.txt"
-          SUBSCRIPTION_URL_ENCODED=$(echo -n "$SUBSCRIPTION_URL_RAW" | jq -sRr @uri)
-
+          
           echo "Downloading original subscription content for inspection..."
           if ! curl -sL "$SUBSCRIPTION_URL_RAW" -o original_subscription_content.txt; then
             echo "Failed to download original subscription content from $SUBSCRIPTION_URL_RAW"
@@ -134,24 +133,29 @@ jobs:
             head -n 20 original_subscription_content.txt
             echo "------------------------------------------------------"
           fi
+
+          # Кодируем содержимое файла в Base64
+          BASE64_CONTENT=$(base64 -w 0 original_subscription_content.txt) 
           
-          echo "Fetching and converting subscription to Clash format with URL: http://127.0.0.1:25500/sub?target=clash&url=${SUBSCRIPTION_URL_ENCODED}"
-          if ! curl --fail -sL "http://127.0.0.1:25500/sub?target=clash&url=${SUBSCRIPTION_URL_ENCODED}" -o sub_clash_config.yaml; then
+          # Формируем data URI
+          DATA_URI_PAYLOAD="data:text/plain;base64,${BASE64_CONTENT}"
+          # URL-кодируем этот data URI для передачи в subconverter
+          SUBSCRIPTION_DATA_ENCODED=$(echo -n "$DATA_URI_PAYLOAD" | jq -sRr @uri)
+          
+          echo "Fetching and converting subscription (via data URI) to Clash format..."
+          if ! curl --fail -sL "http://127.0.0.1:25500/sub?target=clash&url=${SUBSCRIPTION_DATA_ENCODED}" -o sub_clash_config.yaml; then
             CURL_EXIT_CODE_SUB=$?
             echo "Curl command failed to get subscription from subconverter. Exit code: $CURL_EXIT_CODE_SUB"
             echo "--- Subconverter Log (subconverter.log) ---"
             cat subconverter.log
             echo "----------------------------------------"
-            echo "--- Listening Ports (ss -tulnp) ---"
-            ss -tulnp || sudo ss -tulnp
-            echo "-----------------------------------"
             exit 1
           fi
           
           if [ ! -s sub_clash_config.yaml ] || ! grep -q "proxies:" sub_clash_config.yaml; then
             echo "Failed to convert subscription or subscription is empty/invalid (no 'proxies:' section)."
             echo "--- sub_clash_config.yaml content (first 20 lines) ---"
-            head -n 20 sub_clash_config.yaml # Показываем начало полученного файла
+            head -n 20 sub_clash_config.yaml 
             echo "------------------------------------------------------"
             echo "--- Subconverter Log (subconverter.log) ---"
             cat subconverter.log
@@ -165,7 +169,7 @@ jobs:
           PROXY_COUNT=$(yq '.proxies | length' sub_clash_config.yaml)
           if [ -z "$PROXY_COUNT" ] || [ "$PROXY_COUNT" -eq 0 ]; then
             echo "No proxies found in the converted Clash config."
-            echo "--- sub_clash_config.yaml content (full) ---" # Показываем весь файл, если нет прокси
+            echo "--- sub_clash_config.yaml content (full) ---" 
             cat sub_clash_config.yaml
             echo "--------------------------------------------"
             echo "Stopping subconverter..."
