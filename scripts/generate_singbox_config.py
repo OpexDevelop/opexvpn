@@ -7,7 +7,7 @@ def clash_to_singbox_outbound(clash_node, node_id_tag_suffix):
     singbox_outbound = {"tag": clash_node.get("name", node_id_tag_suffix)} 
     node_type = clash_node.get("type")
 
-    if not clash_node.get("server") or clash_node.get("port") is None: # Port can be 0
+    if not clash_node.get("server") or clash_node.get("port") is None:
         print(f"Error: Node '{clash_node.get('name')}' is missing server or port.", file=sys.stderr)
         return None
 
@@ -127,7 +127,11 @@ def clash_to_singbox_outbound(clash_node, node_id_tag_suffix):
         if not password_raw:
             print(f"Error: Trojan Node '{clash_node.get('name')}' is missing password.", file=sys.stderr)
             return None
-        singbox_outbound["password"] = unquote(password_raw)
+        
+        print(f"DEBUG: Trojan password RAW for '{clash_node.get('name')}': '{password_raw}'", file=sys.stderr)
+        password_unquoted = unquote(password_raw)
+        print(f"DEBUG: Trojan password UNQUOTED for '{clash_node.get('name')}': '{password_unquoted}'", file=sys.stderr)
+        singbox_outbound["password"] = password_unquoted
         
         final_sni = clash_node.get("sni", singbox_outbound["server"])
         skip_verify = clash_node.get("skip-cert-verify", False)

@@ -222,6 +222,8 @@ jobs:
             SINGBOX_PID=$!
             sleep 8
 
+            NODE_TEST_SUCCESS=true 
+
             if ! ps -p $SINGBOX_PID > /dev/null; then
                 echo "Sing-box failed to start for $NODE_ID. PID: $SINGBOX_PID"
                 echo "--- Sing-box Log for $NODE_ID ($SINGBOX_NODE_LOG) ---"
@@ -230,75 +232,103 @@ jobs:
                 CURRENT_NODE_JSON=$(jq -n --arg name "$NODE_NAME_RAW" --arg error "Sing-box failed to start" '{name: $name, status: "error", error: $error, timestamp: (now | strftime("%Y-%m-%dT%H:%M:%SZ"))}')
                 RESULTS_JSON_ARRAY=$(echo "$RESULTS_JSON_ARRAY" | jq --argjson item "$CURRENT_NODE_JSON" '. + [$item]')
                 rm -f "$TEMP_SINGBOX_CONFIG" "$SINGBOX_NODE_LOG"
-                continue
+                NODE_TEST_SUCCESS=false # Отмечаем ошибку
             fi
-            echo "Sing-box started with PID $SINGBOX_PID for $NODE_ID."
-
-            PROXY_ADDRESS="socks5h://127.0.0.1:10808"
-
-            echo "Testing IP for $NODE_ID..."
-            IP_INFO_RAW=$(curl -s --connect-timeout 10 --max-time 15 --proxy "$PROXY_ADDRESS" "https://ip.oxylabs.io/location")
             
-            IP_ADDRESS=$(echo "$IP_INFO_RAW" | jq -r '.ip // "N/A"')
-            COUNTRY=$(echo "$IP_INFO_RAW" | jq -r '.providers.dbip.country // .providers.ip2location.country // .providers.ipinfo.country // .providers.maxmind.country // "N/A"')
-            CITY=$(echo "$IP_INFO_RAW" | jq -r '.providers.dbip.city // .providers.ip2location.city // .providers.ipinfo.city // .providers.maxmind.city // "N/A"')
-            ASN_ORG=$(echo "$IP_INFO_RAW" | jq -r '.providers.dbip.org_name // .providers.ip2location.org_name // .providers.ipinfo.org_name // .providers.maxmind.org_name // "N/A"')
-            ASN_NUMBER=$(echo "$IP_INFO_RAW" | jq -r '.providers.dbip.asn // .providers.ip2location.asn // .providers.ipinfo.asn // .providers.maxmind.asn // "N/A"')
+            if [ "$NODE_TEST_SUCCESS" = true ]; then
+                echo "Sing-box started with PID $SINGBOX_PID for $NODE_ID."
+                PROXY_ADDRESS="socks5h://127.0.0.1:10808"
 
-            echo "Running speedtest for $NODE_ID..."
-            SPEEDTEST_OUTPUT_FILE="speedtest_output_${NODE_ID}.txt"
-            SPEEDTEST_ERROR_FILE="speedtest_error_${NODE_ID}.txt"
-            
-            if ALL_PROXY="$PROXY_ADDRESS" speedtest-cli --simple --timeout 45 > "$SPEEDTEST_OUTPUT_FILE" 2> "$SPEEDTEST_ERROR_FILE"; then
-              SPEEDTEST_RESULT_RAW=$(cat "$SPEEDTEST_OUTPUT_FILE")
-            else
-              echo "Speedtest command failed for $NODE_ID. Exit code: $?"
-              echo "--- Speedtest STDOUT ($SPEEDTEST_OUTPUT_FILE) ---"
-              cat "$SPEEDTEST_OUTPUT_FILE"
-              echo "--- Speedtest STDERR ($SPEEDTEST_ERROR_FILE) ---"
-              cat "$SPEEDTEST_ERROR_FILE"
-              echo "---------------------------------------------"
-              SPEEDTEST_RESULT_RAW="Ping: N/A ms Download: N/A Mbit/s Upload: N/A Mbit/s"
+                echo "Testing IP for $NODE_ID..."
+                if ! IP_INFO_RAW=$(curl -s --connect-timeout 10 --max-time 15 --proxy "$PROXY_ADDRESS" "https://ip.oxylabs.io/location"); then
+                    echo "Curl for IP test failed for $NODE_ID"
+                    IP_INFO_RAW="{}" 
+                    NODE_TEST_SUCCESS=false
+                fi
+                
+                IP_ADDRESS=$(echo "$IP_INFO_RAW" | jq -r '.ip // "N/A"')
+                COUNTRY=$(echo "$IP_INFO_RAW" | jq -r '.providers.dbip.country // .providers.ip2location.country // .providers.ipinfo.country // .providers.maxmind.country // "N/A"')
+                CITY=$(echo "$IP_INFO_RAW" | jq -r '.providers.dbip.city // .providers.ip2location.city // .providers.ipinfo.city // .providers.maxmind.city // "N/A"')
+                ASN_ORG=$(echo "$IP_INFO_RAW" | jq -r '.providers.dbip.org_name // .providers.ip2location.org_name // .providers.ipinfo.org_name // .providers.maxmind.org_name // "N/A"')
+                ASN_NUMBER=$(echo "$IP_INFO_RAW" | jq -r '.providers.dbip.asn // .providers.ip2location.asn // .providers.ipinfo.asn // .providers.maxmind.asn // "N/A"')
+
+                echo "Running speedtest for $NODE_ID..."
+                SPEEDTEST_OUTPUT_FILE="speedtest_output_${NODE_ID}.txt"
+                SPEEDTEST_ERROR_FILE="speedtest_error_${NODE_ID}.txt"
+                
+                if ALL_PROXY="$PROXY_ADDRESS" speedtest-cli --simple --timeout 45 > "$SPEEDTEST_OUTPUT_FILE" 2> "$SPEEDTEST_ERROR_FILE"; then
+                  SPEEDTEST_RESULT_RAW=$(cat "$SPEEDTEST_OUTPUT_FILE")
+                else
+                  echo "Speedtest command failed for $NODE_ID. Exit code: $?"
+                  echo "--- Speedtest STDOUT ($SPEEDTEST_OUTPUT_FILE) ---"
+                  cat "$SPEEDTEST_OUTPUT_FILE"
+                  echo "--- Speedtest STDERR ($SPEEDTEST_ERROR_FILE) ---"
+                  cat "$SPEEDTEST_ERROR_FILE"
+                  echo "---------------------------------------------"
+                  SPEEDTEST_RESULT_RAW="Ping: N/A ms Download: N/A Mbit/s Upload: N/A Mbit/s"
+                  NODE_TEST_SUCCESS=false
+                fi
+                rm -f "$SPEEDTEST_OUTPUT_FILE" "$SPEEDTEST_ERROR_FILE"
+
+                PING=$(echo "$SPEEDTEST_RESULT_RAW" | grep -oP 'Ping: \K[0-9.]+(?= ms)' || echo "N/A")
+                DOWNLOAD_SPEED=$(echo "$SPEEDTEST_RESULT_RAW" | grep -oP 'Download: \K[0-9.]+(?= Mbit/s)' || echo "N/A")
+                UPLOAD_SPEED=$(echo "$SPEEDTEST_RESULT_RAW" | grep -oP 'Upload: \K[0-9.]+(?= Mbit/s)' || echo "N/A")
+
+                echo "--- Test Results for $NODE_NAME_RAW (ID: $NODE_ID) ---"
+                echo "IP Address: $IP_ADDRESS"
+                echo "Country: $COUNTRY"
+                echo "City: $CITY"
+                echo "ASN Org: $ASN_ORG"
+                echo "ASN Number: $ASN_NUMBER"
+                echo "Ping: $PING ms"
+                echo "Download: $DOWNLOAD_SPEED Mbit/s"
+                echo "Upload: $UPLOAD_SPEED Mbit/s"
+                echo "--------------------------------------------------"
+            fi # End of if NODE_TEST_SUCCESS is true
+
+            if ps -p $SINGBOX_PID > /dev/null; then # Если sing-box все еще работает (или был запущен)
+                echo "Stopping Sing-box for $NODE_ID (PID $SINGBOX_PID)..."
+                kill -SIGTERM $SINGBOX_PID || echo "Failed to send SIGTERM to Sing-box"
+                n=0
+                while ps -p $SINGBOX_PID > /dev/null && [ $n -lt 3 ]; do # Уменьшаем ожидание до 3 секунд
+                  sleep 1
+                  n=$((n+1))
+                done
+                if ps -p $SINGBOX_PID > /dev/null; then 
+                    kill -SIGKILL $SINGBOX_PID || echo "Failed to send SIGKILL"
+                fi
+                wait $SINGBOX_PID 2>/dev/null 
+                echo "Sing-box stopped for $NODE_ID."
             fi
-            rm -f "$SPEEDTEST_OUTPUT_FILE" "$SPEEDTEST_ERROR_FILE"
-
-            PING=$(echo "$SPEEDTEST_RESULT_RAW" | grep -oP 'Ping: \K[0-9.]+(?= ms)' || echo "N/A")
-            DOWNLOAD_SPEED=$(echo "$SPEEDTEST_RESULT_RAW" | grep -oP 'Download: \K[0-9.]+(?= Mbit/s)' || echo "N/A")
-            UPLOAD_SPEED=$(echo "$SPEEDTEST_RESULT_RAW" | grep -oP 'Upload: \K[0-9.]+(?= Mbit/s)' || echo "N/A")
-
-            echo "--- Test Results for $NODE_NAME_RAW (ID: $NODE_ID) ---"
-            echo "IP Address: $IP_ADDRESS"
-            echo "Country: $COUNTRY"
-            echo "City: $CITY"
-            echo "ASN Org: $ASN_ORG"
-            echo "ASN Number: $ASN_NUMBER"
-            echo "Ping: $PING ms"
-            echo "Download: $DOWNLOAD_SPEED Mbit/s"
-            echo "Upload: $UPLOAD_SPEED Mbit/s"
-            echo "--------------------------------------------------"
-
-            kill -SIGTERM $SINGBOX_PID || echo "Failed to send SIGTERM to Sing-box"
-            wait $SINGBOX_PID 2>/dev/null
-            echo "Sing-box stopped for $NODE_ID."
 
             if [ -s "$SINGBOX_NODE_LOG" ]; then
                 echo "--- Sing-box Log for $NODE_ID ($SINGBOX_NODE_LOG) ---"
                 cat "$SINGBOX_NODE_LOG" 
                 echo "-------------------------------------------------"
+            else
+                echo "Sing-box log for $NODE_ID is empty or not found."
             fi
             rm -f "$SINGBOX_NODE_LOG"
 
-            CURRENT_NODE_JSON=$(jq -n \
-              --arg name "$NODE_NAME_RAW" \
-              --arg ip "$IP_ADDRESS" \
-              --arg country "$COUNTRY" \
-              --arg city "$CITY" \
-              --arg asn_org "$ASN_ORG" \
-              --arg asn_number "$ASN_NUMBER" \
-              --arg ping "$PING" \
-              --arg download "$DOWNLOAD_SPEED" \
-              --arg upload "$UPLOAD_SPEED" \
-              '{name: $name, ip_address: $ip, country_code: $country, city: $city, asn_organization: $asn_org, asn_number: $asn_number, ping_ms: $ping, download_mbps: $download, upload_mbps: $upload, status: "tested", timestamp: (now | strftime("%Y-%m-%dT%H:%M:%SZ"))}')
+            # Собираем JSON даже если тесты упали, чтобы записать ошибку или N/A
+            if [ "$NODE_TEST_SUCCESS" = false ] && [ ! -f TEMP_SINGBOX_CONFIG ]; then # Если sing-box даже не стартанул
+                 CURRENT_NODE_JSON=$(jq -n \
+                    --arg name "$NODE_NAME_RAW" \
+                    --arg error_msg "$(jq -r .error TEMP_SINGBOX_CONFIG 2>/dev/null || echo 'Sing-box start failed or test failed before IP check')" \
+                    '{name: $name, status: "error", error: $error_msg, timestamp: (now | strftime("%Y-%m-%dT%H:%M:%SZ"))}')
+            else
+                CURRENT_NODE_JSON=$(jq -n \
+                  --arg name "$NODE_NAME_RAW" \
+                  --arg ip "$IP_ADDRESS" \
+                  --arg country "$COUNTRY" \
+                  --arg city "$CITY" \
+                  --arg asn_org "$ASN_ORG" \
+                  --arg asn_number "$ASN_NUMBER" \
+                  --arg ping "$PING" \
+                  --arg download "$DOWNLOAD_SPEED" \
+                  --arg upload "$UPLOAD_SPEED" \
+                  '{name: $name, ip_address: $ip, country_code: $country, city: $city, asn_organization: $asn_org, asn_number: $asn_number, ping_ms: $ping, download_mbps: $download, upload_mbps: $upload, status: "tested", timestamp: (now | strftime("%Y-%m-%dT%H:%M:%SZ"))}')
+            fi
             
             RESULTS_JSON_ARRAY=$(echo "$RESULTS_JSON_ARRAY" | jq --argjson item "$CURRENT_NODE_JSON" '. + [$item]')
             rm -f "$TEMP_SINGBOX_CONFIG"
