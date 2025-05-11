@@ -35,24 +35,24 @@ jobs:
           wget https://github.com/tindy2013/subconverter/releases/download/${SUBVERTER_VERSION}/subconverter_linux64.tar.gz
           
           echo "Removing any pre-existing 'subconverter' file or directory to ensure clean extraction..."
-          rm -rf ./subconverter ./subconverter_linux64
+          rm -rf ./subconverter ./subconverter_linux64 
           
           echo "Extracting subconverter (output will show extracted files)..."
           tar -xvf subconverter_linux64.tar.gz
           
-          ACTUAL_SUBہوںCONVERTER_BINARY="./subconverter/subconverter"
+          ACTUAL_SUBCONVERTER_BINARY="./subconverter/subconverter" 
           
-          if [ ! -f "$ACTUAL_SUBہوںCONVERTER_BINARY" ]; then
-            echo "Subconverter binary not found at $ACTUAL_SUBہوںCONVERTER_BINARY after extraction. Listing current directory contents recursively:"
-            ls -lahR . # Показываем содержимое текущей директории и всех поддиректорий
+          if [ ! -f "$ACTUAL_SUBCONVERTER_BINARY" ]; then
+            echo "Subconverter binary not found at $ACTUAL_SUBCONVERTER_BINARY after extraction. Listing current directory contents recursively:"
+            ls -lahR . 
             exit 1
           fi
           
-          echo "Making subconverter executable: $ACTUAL_SUBہوںCONVERTER_BINARY"
-          chmod +x "$ACTUAL_SUBہوںCONVERTER_BINARY"
+          echo "Making subconverter executable: $ACTUAL_SUBCONVERTER_BINARY"
+          chmod +x "$ACTUAL_SUBCONVERTER_BINARY"
           
           echo "Subconverter version check:"
-          "$ACTUAL_SUBہوںCONVERTER_BINARY" -v || echo "Subconverter version check failed."
+          "$ACTUAL_SUBCONVERTER_BINARY" -v || echo "Subconverter version check failed."
           
           echo "Creating minimal pref.ini for subconverter in current directory..."
           cat <<EOF > pref.ini
@@ -72,8 +72,8 @@ jobs:
           echo "pref.ini created in current directory (workspace root)."
 
           echo "Starting subconverter in background..."
-          nohup "$ACTUAL_SUBہوںCONVERTER_BINARY" > subconverter.log 2>&1 &
-          SUBCONVERTER_PID=$!
+          nohup "$ACTUAL_SUBCONVERTER_BINARY" > subconverter.log 2>&1 &
+          SUBCONVERTER_PID=$! 
           echo "Subconverter PID: $SUBCONVERTER_PID"
           
           sleep 8 
