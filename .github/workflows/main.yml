@@ -9,7 +9,7 @@ on:
     - cron: '0 0 * * *'
 
 jobs:
-  test_proxies:
+  update_and_test_proxies: # Переименуем job для ясности
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -26,12 +26,46 @@ jobs:
         run: |
           pip install PyYAML
           sudo apt-get update
-          sudo apt-get install -y curl jq speedtest-cli yq
+          sudo apt-get install -y curl jq speedtest-cli yq coreutils
+
+      - name: Fetch Gist, encode, and update local file
+        id: update_encoded_sub
+        run: |
+          GIST_URL="https://gist.githubusercontent.com/OpexDevelop/a676272468c9b6ac804092250ce9bc67/raw/opexvpn-high.txt"
+          ENCODED_FILE="encoded_subscription.txt" # Файл в репозитории
+
+          echo "Fetching content from Gist: $GIST_URL"
+          if ! curl -sL "$GIST_URL" -o original_sub_content.tmp; then
+            echo "Failed to download from Gist."
+            exit 1
+          fi
+
+          echo "Encoding Gist content to Base64..."
+          # base64 -w 0 для GNU base64, чтобы не было переносов строк
+          base64 -w 0 original_sub_content.tmp > "$ENCODED_FILE"
+          rm original_sub_content.tmp
+
+          echo "Encoded content saved to $ENCODED_FILE"
+          echo "::set-output name=encoded_file_path::$ENCODED_FILE" # Передаем имя файла дальше
+
+          # Коммитим этот файл, если он изменился
+          git config --global user.name 'GitHub Actions Bot'
+          git config --global user.email 'github-actions-bot@users.noreply.github.com'
+          git add "$ENCODED_FILE"
+          if ! git diff --staged --quiet; then
+            git commit -m "Update encoded subscription from Gist"
+            # git push # Push будет сделан в конце вместе с proxy_results.json
+            echo "Encoded subscription file updated and staged for commit."
+          else
+            echo "No changes to encoded subscription from Gist."
+          fi
 
       - name: Download and prepare subconverter
         id: prepare_subconverter
         run: |
           SUBVERTER_VERSION="v0.9.0"
+          # ... (остальная часть этого шага как в предыдущем рабочем варианте) ...
+          # Только убедимся, что он не пытается ничего делать с URL здесь
           echo "Downloading subconverter..."
           wget https://github.com/tindy2013/subconverter/releases/download/${SUBVERTER_VERSION}/subconverter_linux64.tar.gz
           
@@ -65,7 +99,6 @@ jobs:
           loon_rule_base=
           sssub_rule_base=
           default_external_config=
-          # log_level = debug
           EOF
           echo "pref.ini created in current directory (workspace root)."
           echo "subconverter_binary_path=$ACTUAL_SUBCONVERTER_BINARY" >> $GITHUB_OUTPUT
@@ -74,6 +107,7 @@ jobs:
       - name: Start and health check subconverter
         run: |
           ACTUAL_SUBCONVERTER_BINARY="${{ steps.prepare_subconverter.outputs.subconverter_binary_path }}"
+          # ... (остальная часть этого шага как в предыдущем рабочем варианте) ...
           echo "Starting subconverter ($ACTUAL_SUBCONVERTER_BINARY) in background..."
           nohup "$ACTUAL_SUBCONVERTER_BINARY" > subconverter.log 2>&1 &
           SUBCONVERTER_PID=$!
@@ -108,6 +142,7 @@ jobs:
           fi
 
       - name: Download and install Sing-box
+        # ... (без изменений) ...
         run: |
           SINGBOX_VERSION="1.11.10"
           wget https://github.com/SagerNet/sing-box/releases/download/v${SINGBOX_VERSION}/sing-box-${SINGBOX_VERSION}-linux-amd64.tar.gz
@@ -117,26 +152,55 @@ jobs:
           sing-box version
 
       - name: Ensure Python script is executable
+        # ... (без изменений) ...
         run: chmod +x scripts/generate_singbox_config.py
 
-      - name: Fetch subscription, convert with subconverter, and process nodes
+      - name: Fetch ENCODED subscription from repo, convert, and process nodes
         id: process_nodes
+        env:
+          REPO_OWNER: ${{ github.repository_owner }}
+          REPO_NAME: ${{ github.event.repository.name }}
         run: |
-          SUBSCRIPTION_URL_RAW="https://gist.githubusercontent.com/OpexDevelop/a676272468c9b6ac804092250ce9bc67/raw/opexvpn-high.txt"
-          SUBSCRIPTION_URL_ENCODED=$(echo -n "$SUBSCRIPTION_URL_RAW" | jq -sRr @uri)
-          FILENAME_PARAM_ENCODED=$(echo -n "opexvpn.txt" | jq -sRr @uri)
+          # Получаем путь к файлу из предыдущего шага
+          ENCODED_SUB_FILE_PATH="${{ steps.update_encoded_sub.outputs.encoded_file_path }}"
 
-          echo "Downloading original subscription content for inspection..."
-          if ! curl -sL "$SUBSCRIPTION_URL_RAW" -o original_subscription_content.txt; then
-            echo "Failed to download original subscription content from $SUBSCRIPTION_URL_RAW"
-          else
-            echo "--- Original Subscription Content (first 20 lines) ---"
-            head -n 20 original_subscription_content.txt
-            echo "------------------------------------------------------"
+          # Формируем URL к raw файлу в текущем коммите (или последнем коммите ветки)
+          # Важно: этот URL будет указывать на версию файла, которая была в репозитории ДО текущего push,
+          # если этот workflow запускается по push. Если по schedule, то на последний коммит.
+          # Для большей надежности, если файл только что создан/обновлен в шаге update_encoded_sub,
+          # мы можем просто прочитать его локально, так как он уже в рабочей директории.
+          
+          if [ ! -f "$ENCODED_SUB_FILE_PATH" ]; then
+            echo "Encoded subscription file '$ENCODED_SUB_FILE_PATH' not found locally. This shouldn't happen."
+            # Попытка скачать с сервера (менее надежно для только что обновленного файла)
+            # RAW_ENCODED_SUB_URL="https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/${ENCODED_SUB_FILE_PATH}"
+            # echo "Attempting to download from $RAW_ENCODED_SUB_URL"
+            # if ! curl -sL "$RAW_ENCODED_SUB_URL" -o "$ENCODED_SUB_FILE_PATH"; then
+            #   echo "Failed to download $ENCODED_SUB_FILE_PATH from repository."
+            #   exit 1
+            # fi
+            exit 1
           fi
           
-          echo "Fetching and converting subscription to Clash format with URL: http://127.0.0.1:25500/sub?target=clash&filename=${FILENAME_PARAM_ENCODED}&url=${SUBSCRIPTION_URL_ENCODED}"
-          if ! curl --fail -sL "http://127.0.0.1:25500/sub?target=clash&filename=${FILENAME_PARAM_ENCODED}&url=${SUBSCRIPTION_URL_ENCODED}" -o sub_clash_config.yaml; then
+          echo "Using local encoded subscription file: $ENCODED_SUB_FILE_PATH"
+          # URL-кодируем содержимое файла (которое уже base64) для передачи в subconverter
+          # Важно: subconverter ожидает, что сам URL (или data URI) будет URL-кодирован.
+          # Если мы передаем содержимое файла, которое уже base64, мы должны сказать subconverter, что это base64.
+          # Это делается параметром &base64=true или если URL начинается с data:text/plain;base64,
+          # Но мы передаем URL на файл, содержимое которого base64.
+          # subconverter должен сам определить, что содержимое файла - это base64.
+          
+          # Создаем временный URL, который указывает на локальный base64 файл
+          # и добавляем параметр, чтобы subconverter знал, что это base64
+          # Это не сработает, так как subconverter ожидает HTTP URL или data URI.
+          # Вместо этого, мы передадим содержимое файла как data URI.
+
+          BASE64_CONTENT_FROM_FILE=$(cat "$ENCODED_SUB_FILE_PATH")
+          DATA_URI_PAYLOAD="data:text/plain;base64,${BASE64_CONTENT_FROM_FILE}"
+          SUBSCRIPTION_DATA_ENCODED=$(echo -n "$DATA_URI_PAYLOAD" | jq -sRr @uri)
+
+          echo "Fetching and converting subscription (from local base64 file via data URI) to Clash format..."
+          if ! curl --fail -sL "http://127.0.0.1:25500/sub?target=clash&url=${SUBSCRIPTION_DATA_ENCODED}" -o sub_clash_config.yaml; then
             CURL_EXIT_CODE_SUB=$?
             echo "Curl command failed to get subscription from subconverter. Exit code: $CURL_EXIT_CODE_SUB"
             echo "--- Subconverter Log (subconverter.log) ---"
@@ -145,6 +209,7 @@ jobs:
             exit 1
           fi
           
+          # ... (остальная часть этого шага как в предыдущем рабочем варианте) ...
           if [ ! -s sub_clash_config.yaml ] || ! grep -q "proxies:" sub_clash_config.yaml; then
             echo "Failed to convert subscription or subscription is empty/invalid (no 'proxies:' section)."
             echo "--- sub_clash_config.yaml content (first 20 lines) ---"
@@ -266,10 +331,11 @@ jobs:
         run: |
           git config --global user.name 'GitHub Actions Bot'
           git config --global user.email 'github-actions-bot@users.noreply.github.com'
-          git add proxy_results.json
+          # Добавляем оба файла, если они изменились
+          git add proxy_results.json encoded_subscription.txt
           if ! git diff --staged --quiet; then
-            git commit -m "Update proxy test results ($(date -u +'%Y-%m-%d %H:%M:%S UTC'))"
+            git commit -m "Update proxy test results and encoded Gist ($(date -u +'%Y-%m-%d %H:%M:%S UTC'))"
             git push
           else
-            echo "No changes to proxy results."
+            echo "No changes to proxy results or encoded Gist."
           fi
