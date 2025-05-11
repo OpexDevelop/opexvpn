@@ -30,18 +30,75 @@ jobs:
 
       - name: Download and install subconverter
         run: |
-          SUBVERTER_VERSION="v0.9.0" # ИСПРАВЛЕННАЯ ВЕРСИЯ
+          SUBVERTER_VERSION="v0.9.0"
           wget https://github.com/tindy2013/subconverter/releases/download/${SUBVERTER_VERSION}/subconverter_linux64.tar.gz
           tar -xzf subconverter_linux64.tar.gz
           sudo mv subconverter /usr/local/bin/subconverter
           sudo chmod +x /usr/local/bin/subconverter
+          echo "Subconverter version:"
           subconverter -v || echo "Subconverter version check failed."
+          
+          echo "Creating minimal pref.ini for subconverter..."
+          cat <<EOF > pref.ini
+          [server]
+          listen = 127.0.0.1
+          port = 25500
+          [common]
+          clash_rule_base=
+          surge_rule_base=
+          surfboard_rule_base=
+          mellow_rule_base=
+          loon_rule_base=
+          sssub_rule_base=
+          default_external_config=
+          # Устанавливаем уровень логирования, чтобы видеть больше информации при необходимости
+          # log_level = info 
+          EOF
+          echo "pref.ini created:"
+          cat pref.ini
+
+          echo "Starting subconverter in background (from directory with pref.ini)..."
           nohup subconverter > subconverter.log 2>&1 &
-          sleep 5
+          SUBہوںCONVERTER_PID=$!
+          echo "Subconverter PID: $SUBہوںCONVERTER_PID"
+          
+          sleep 8 
+          if ! ps -p $SUBہوںCONVERTER_PID > /dev/null; then
+            echo "Subconverter process $SUBہوںCONVERTER_PID is not running!"
+            echo "--- Subconverter Log (subconverter.log) ---"
+            cat subconverter.log
+            echo "----------------------------------------"
+            exit 1
+          else
+            echo "Subconverter is running (PID: $SUBہوںCONVERTER_PID)."
+          fi
+
+          echo "Attempting to connect to subconverter for a health check..."
+          # Пробуем простой запрос к /sub без параметров, он должен вернуть ошибку, но не сетевую
+          # Опция -f (--fail) заставит curl вернуть ошибку при HTTP статусах >= 400
+          # Опция -S (--show-error) покажет ошибку, если -s (--silent) используется
+          # Опция -s (--silent) чтобы не выводить тело ответа в лог health check
+          if curl --connect-timeout 5 -sfS "http://127.0.0.1:25500/sub" > /dev/null; then
+            # Это неожиданно, /sub без параметров должен вернуть ошибку HTTP
+            echo "Subconverter health check: Received unexpected HTTP success (2xx) from /sub without params."
+            # Тем не менее, это означает, что сервер доступен.
+          elif [ $? -eq 22 ]; then # Код ошибки curl 22 для HTTP 4xx/5xx (когда используется -f)
+            echo "Subconverter health check successful (received expected HTTP error from /sub, means server is up)."
+          else
+            CURL_EXIT_CODE=$?
+            echo "Subconverter health check failed. Curl exit code: $CURL_EXIT_CODE"
+            echo "--- Subconverter Log (subconverter.log) ---"
+            cat subconverter.log
+            echo "----------------------------------------"
+            echo "--- Listening Ports (ss -tulnp) ---"
+            sudo ss -tulnp
+            echo "-----------------------------------"
+            exit 1
+          fi
 
       - name: Download and install Sing-box
         run: |
-          SINGBOX_VERSION="1.11.10" # Проверьте последнюю стабильную версию, если нужно
+          SINGBOX_VERSION="1.11.10"
           wget https://github.com/SagerNet/sing-box/releases/download/v${SINGBOX_VERSION}/sing-box-${SINGBOX_VERSION}-linux-amd64.tar.gz
           tar -xzf sing-box-${SINGBOX_VERSION}-linux-amd64.tar.gz
           sudo mv sing-box-${SINGBOX_VERSION}-linux-amd64/sing-box /usr/local/bin/sing-box
@@ -58,12 +115,26 @@ jobs:
           SUBSCRIPTION_URL_ENCODED=$(echo "$SUBSCRIPTION_URL_RAW" | jq -sRr @uri)
 
           echo "Fetching and converting subscription to Clash format..."
-          curl -sL "http://127.0.0.1:25500/sub?target=clash&url=${SUBSCRIPTION_URL_ENCODED}" -o sub_clash_config.yaml
-
-          if [ ! -s sub_clash_config.yaml ]; then
-            echo "Failed to convert subscription or subscription is empty."
-            echo "Subconverter log:"
+          if ! curl --fail -sL "http://127.0.0.1:25500/sub?target=clash&url=${SUBSCRIPTION_URL_ENCODED}" -o sub_clash_config.yaml; then
+            CURL_EXIT_CODE_SUB=$?
+            echo "Curl command failed to get subscription from subconverter. Exit code: $CURL_EXIT_CODE_SUB"
+            echo "--- Subconverter Log (subconverter.log) ---"
             cat subconverter.log
+            echo "----------------------------------------"
+            echo "--- Listening Ports (ss -tulnp) ---"
+            sudo ss -tulnp
+            echo "-----------------------------------"
+            exit 1
+          fi
+          
+          if [ ! -s sub_clash_config.yaml ] || ! grep -q "proxies:" sub_clash_config.yaml; then
+            echo "Failed to convert subscription or subscription is empty/invalid (no 'proxies:' section)."
+            echo "--- sub_clash_config.yaml content ---"
+            cat sub_clash_config.yaml
+            echo "-------------------------------------"
+            echo "--- Subconverter Log (subconverter.log) ---"
+            cat subconverter.log
+            echo "----------------------------------------"
             exit 1
           fi
           echo "Subscription converted to sub_clash_config.yaml"
