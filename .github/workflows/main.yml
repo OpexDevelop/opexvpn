@@ -35,19 +35,16 @@ jobs:
         run: |
           GIST_URL="https://gist.githubusercontent.com/OpexDevelop/a676272468c9b6ac804092250ce9bc67/raw/opexvpn-high.txt"
           ENCODED_FILE_NAME="encoded_subscription.txt"
-
           echo "Fetching content from Gist: $GIST_URL"
           if ! curl -sL "$GIST_URL" -o original_sub_content.tmp; then
             echo "Failed to download from Gist."
             exit 1
           fi
-
           echo "Encoding Gist content to Base64..."
           base64 -w 0 original_sub_content.tmp > "$ENCODED_FILE_NAME"
           rm original_sub_content.tmp
           echo "Encoded content saved to $ENCODED_FILE_NAME"
           echo "encoded_file_name=$ENCODED_FILE_NAME" >> $GITHUB_OUTPUT
-
           git config --global user.name 'GitHub Actions Bot'
           git config --global user.email 'github-actions-bot@users.noreply.github.com'
           git add "$ENCODED_FILE_NAME"
@@ -121,30 +118,24 @@ jobs:
 
       - name: Download and install Sing-box
         run: |
-          SINGBOX_VERSION="1.11.10" 
-          SINGBOX_ARCHIVE_NAME="sing-box-${SINGBOX_VERSION}-linux-amd64"
-          wget https://github.com/SagerNet/sing-box/releases/download/v${SINGBOX_VERSION}/${SINGBOX_ARCHIVE_NAME}.tar.gz
-          tar -xzf ${SINGBOX_ARCHIVE_NAME}.tar.gz
-          
-          SINGBOX_EXTRACTED_PATH=""
-          if [ -f ./${SINGBOX_ARCHIVE_NAME}/sing-box ]; then # Если распаковалось в папку с версией
-            SINGBOX_EXTRACTED_PATH="./${SINGBOX_ARCHIVE_NAME}/sing-box"
-          elif [ -f ./sing-box ]; then # Если распаковалось как просто sing-box
-             SINGBOX_EXTRACTED_PATH="./sing-box"
-          else # Попробуем угадать имя папки из архива, если оно другое
-            RELEASE_DIR_NAME=$(tar -tzf ${SINGBOX_ARCHIVE_NAME}.tar.gz | head -1 | cut -f1 -d"/")
+          SINGBOX_VERSION="1.11.10"
+          wget https://github.com/SagerNet/sing-box/releases/download/v${SINGBOX_VERSION}/sing-box-${SINGBOX_VERSION}-linux-amd64.tar.gz
+          tar -xzf sing-box-${SINGBOX_VERSION}-linux-amd64.tar.gz
+          if [ -f ./sing-box-${SINGBOX_VERSION}-linux-amd64/sing-box ]; then
+            sudo mv ./sing-box-${SINGBOX_VERSION}-linux-amd64/sing-box /usr/local/bin/sing-box
+          elif [ -f ./sing-box ]; then 
+             sudo mv ./sing-box /usr/local/bin/sing-box
+          else
+            echo "Sing-box binary not found after extraction. Listing files:"
+            ls -lah
+            RELEASE_DIR_NAME=$(tar -tzf sing-box-${SINGBOX_VERSION}-linux-amd64.tar.gz | head -1 | cut -f1 -d"/")
             if [ -f ./${RELEASE_DIR_NAME}/sing-box ]; then
-                SINGBOX_EXTRACTED_PATH="./${RELEASE_DIR_NAME}/sing-box"
+                sudo mv ./${RELEASE_DIR_NAME}/sing-box /usr/local/bin/sing-box
+            else
+                echo "Still cannot find sing-box binary."
+                exit 1
             fi
           fi
-
-          if [ -z "$SINGBOX_EXTRACTED_PATH" ] || [ ! -f "$SINGBOX_EXTRACTED_PATH" ]; then
-            echo "Sing-box binary not found after extraction. Listing files:"
-            ls -lahR .
-            exit 1
-          fi
-          echo "Found sing-box binary at: $SINGBOX_EXTRACTED_PATH"
-          sudo mv "$SINGBOX_EXTRACTED_PATH" /usr/local/bin/sing-box
           sudo chmod +x /usr/local/bin/sing-box
           sing-box version
 
@@ -209,7 +200,7 @@ jobs:
 
             echo "Processing Node $((i + 1))/$PROXY_COUNT: $NODE_NAME_RAW (ID: $NODE_ID)"
             TEMP_SINGBOX_CONFIG="temp_singbox_config_${NODE_ID}.json"
-            SINGBOX_NODE_LOG="singbox_node_${NODE_ID}.log" 
+            SINGBOX_NODE_LOG="singbox_node_${NODE_ID}.log"
 
             echo "--- Clash Node JSON for $NODE_NAME_RAW ---"
             yq -r ".proxies[$i] | tojson" sub_clash_config.yaml 
@@ -231,56 +222,50 @@ jobs:
             SINGBOX_PID=$!
             sleep 8
 
-            NODE_TEST_STATUS="ok" # Статус по умолчанию
-
             if ! ps -p $SINGBOX_PID > /dev/null; then
                 echo "Sing-box failed to start for $NODE_ID. PID: $SINGBOX_PID"
-                NODE_TEST_STATUS="failed_singbox_start"
-                IP_ADDRESS="N/A"; COUNTRY="N/A"; CITY="N/A"; ASN_ORG="N/A"; ASN_NUMBER="N/A"; PING="N/A"; DOWNLOAD_SPEED="N/A"; UPLOAD_SPEED="N/A"
-            else
-                echo "Sing-box started with PID $SINGBOX_PID for $NODE_ID."
-                PROXY_ADDRESS="socks5h://127.0.0.1:10808"
-
-                echo "Testing IP for $NODE_ID..."
-                IP_INFO_RAW=$(curl -s --connect-timeout 10 --max-time 15 --proxy "$PROXY_ADDRESS" "https://ip.oxylabs.io/location")
-                
-                IP_ADDRESS=$(echo "$IP_INFO_RAW" | jq -r '.ip // "N/A"')
-                COUNTRY=$(echo "$IP_INFO_RAW" | jq -r '.providers.dbip.country // .providers.ip2location.country // .providers.ipinfo.country // .providers.maxmind.country // "N/A"')
-                CITY=$(echo "$IP_INFO_RAW" | jq -r '.providers.dbip.city // .providers.ip2location.city // .providers.ipinfo.city // .providers.maxmind.city // "N/A"')
-                ASN_ORG=$(echo "$IP_INFO_RAW" | jq -r '.providers.dbip.org_name // .providers.ip2location.org_name // .providers.ipinfo.org_name // .providers.maxmind.org_name // "N/A"')
-                ASN_NUMBER=$(echo "$IP_INFO_RAW" | jq -r '.providers.dbip.asn // .providers.ip2location.asn // .providers.ipinfo.asn // .providers.maxmind.asn // "N/A"')
-
-                if [ "$IP_ADDRESS" == "N/A" ]; then NODE_TEST_STATUS="failed_ip_test"; fi
-
-                echo "Running speedtest for $NODE_ID..."
-                SPEEDTEST_OUTPUT_FILE="speedtest_output_${NODE_ID}.txt"
-                SPEEDTEST_ERROR_FILE="speedtest_error_${NODE_ID}.txt"
-                
-                if ALL_PROXY="$PROXY_ADDRESS" speedtest-cli --simple --timeout 45 > "$SPEEDTEST_OUTPUT_FILE" 2> "$SPEEDTEST_ERROR_FILE"; then
-                  SPEEDTEST_RESULT_RAW=$(cat "$SPEEDTEST_OUTPUT_FILE")
-                else
-                  echo "Speedtest command failed for $NODE_ID. Exit code: $?"
-                  echo "--- Speedtest STDOUT ($SPEEDTEST_OUTPUT_FILE) ---"
-                  cat "$SPEEDTEST_OUTPUT_FILE"
-                  echo "--- Speedtest STDERR ($SPEEDTEST_ERROR_FILE) ---"
-                  cat "$SPEEDTEST_ERROR_FILE"
-                  echo "---------------------------------------------"
-                  SPEEDTEST_RESULT_RAW="Ping: N/A ms Download: N/A Mbit/s Upload: N/A Mbit/s"
-                  if [ "$NODE_TEST_STATUS" == "ok" ]; then NODE_TEST_STATUS="failed_speedtest"; fi
-                fi
-                rm -f "$SPEEDTEST_OUTPUT_FILE" "$SPEEDTEST_ERROR_FILE"
-
-                PING=$(echo "$SPEEDTEST_RESULT_RAW" | grep -oP 'Ping: \K[0-9.]+(?= ms)' || echo "N/A")
-                DOWNLOAD_SPEED=$(echo "$SPEEDTEST_RESULT_RAW" | grep -oP 'Download: \K[0-9.]+(?= Mbit/s)' || echo "N/A")
-                UPLOAD_SPEED=$(echo "$SPEEDTEST_RESULT_RAW" | grep -oP 'Upload: \K[0-9.]+(?= Mbit/s)' || echo "N/A")
-
-                if [ "$PING" == "N/A" ] && [ "$NODE_TEST_STATUS" == "ok" ]; then NODE_TEST_STATUS="failed_speedtest_ping"; fi
-                
-                kill -SIGTERM $SINGBOX_PID || echo "Failed to send SIGTERM to Sing-box"
-                wait $SINGBOX_PID 2>/dev/null
-                echo "Sing-box stopped for $NODE_ID."
+                echo "--- Sing-box Log for $NODE_ID ($SINGBOX_NODE_LOG) ---"
+                cat "$SINGBOX_NODE_LOG"
+                echo "-------------------------------------------------"
+                CURRENT_NODE_JSON=$(jq -n --arg name "$NODE_NAME_RAW" --arg error "Sing-box failed to start" '{name: $name, status: "error", error: $error, timestamp: (now | strftime("%Y-%m-%dT%H:%M:%SZ"))}')
+                RESULTS_JSON_ARRAY=$(echo "$RESULTS_JSON_ARRAY" | jq --argjson item "$CURRENT_NODE_JSON" '. + [$item]')
+                rm -f "$TEMP_SINGBOX_CONFIG" "$SINGBOX_NODE_LOG"
+                continue
             fi
+            echo "Sing-box started with PID $SINGBOX_PID for $NODE_ID."
+
+            PROXY_ADDRESS="socks5h://127.0.0.1:10808"
+
+            echo "Testing IP for $NODE_ID..."
+            IP_INFO_RAW=$(curl -s --connect-timeout 10 --max-time 15 --proxy "$PROXY_ADDRESS" "https://ip.oxylabs.io/location")
             
+            IP_ADDRESS=$(echo "$IP_INFO_RAW" | jq -r '.ip // "N/A"')
+            COUNTRY=$(echo "$IP_INFO_RAW" | jq -r '.providers.dbip.country // .providers.ip2location.country // .providers.ipinfo.country // .providers.maxmind.country // "N/A"')
+            CITY=$(echo "$IP_INFO_RAW" | jq -r '.providers.dbip.city // .providers.ip2location.city // .providers.ipinfo.city // .providers.maxmind.city // "N/A"')
+            ASN_ORG=$(echo "$IP_INFO_RAW" | jq -r '.providers.dbip.org_name // .providers.ip2location.org_name // .providers.ipinfo.org_name // .providers.maxmind.org_name // "N/A"')
+            ASN_NUMBER=$(echo "$IP_INFO_RAW" | jq -r '.providers.dbip.asn // .providers.ip2location.asn // .providers.ipinfo.asn // .providers.maxmind.asn // "N/A"')
+
+            echo "Running speedtest for $NODE_ID..."
+            SPEEDTEST_OUTPUT_FILE="speedtest_output_${NODE_ID}.txt"
+            SPEEDTEST_ERROR_FILE="speedtest_error_${NODE_ID}.txt"
+            
+            if ALL_PROXY="$PROXY_ADDRESS" speedtest-cli --simple --timeout 45 > "$SPEEDTEST_OUTPUT_FILE" 2> "$SPEEDTEST_ERROR_FILE"; then
+              SPEEDTEST_RESULT_RAW=$(cat "$SPEEDTEST_OUTPUT_FILE")
+            else
+              echo "Speedtest command failed for $NODE_ID. Exit code: $?"
+              echo "--- Speedtest STDOUT ($SPEEDTEST_OUTPUT_FILE) ---"
+              cat "$SPEEDTEST_OUTPUT_FILE"
+              echo "--- Speedtest STDERR ($SPEEDTEST_ERROR_FILE) ---"
+              cat "$SPEEDTEST_ERROR_FILE"
+              echo "---------------------------------------------"
+              SPEEDTEST_RESULT_RAW="Ping: N/A ms Download: N/A Mbit/s Upload: N/A Mbit/s"
+            fi
+            rm -f "$SPEEDTEST_OUTPUT_FILE" "$SPEEDTEST_ERROR_FILE"
+
+            PING=$(echo "$SPEEDTEST_RESULT_RAW" | grep -oP 'Ping: \K[0-9.]+(?= ms)' || echo "N/A")
+            DOWNLOAD_SPEED=$(echo "$SPEEDTEST_RESULT_RAW" | grep -oP 'Download: \K[0-9.]+(?= Mbit/s)' || echo "N/A")
+            UPLOAD_SPEED=$(echo "$SPEEDTEST_RESULT_RAW" | grep -oP 'Upload: \K[0-9.]+(?= Mbit/s)' || echo "N/A")
+
             echo "--- Test Results for $NODE_NAME_RAW (ID: $NODE_ID) ---"
             echo "IP Address: $IP_ADDRESS"
             echo "Country: $COUNTRY"
@@ -290,19 +275,16 @@ jobs:
             echo "Ping: $PING ms"
             echo "Download: $DOWNLOAD_SPEED Mbit/s"
             echo "Upload: $UPLOAD_SPEED Mbit/s"
-            echo "Node Test Status: $NODE_TEST_STATUS"
             echo "--------------------------------------------------"
-            
+
+            kill -SIGTERM $SINGBOX_PID || echo "Failed to send SIGTERM to Sing-box"
+            wait $SINGBOX_PID 2>/dev/null
+            echo "Sing-box stopped for $NODE_ID."
+
             if [ -s "$SINGBOX_NODE_LOG" ]; then
-                # Выводим лог sing-box всегда, если он не пустой, или если были проблемы
-                if [ "$NODE_TEST_STATUS" != "ok" ] || ! ps -p $SINGBOX_PID > /dev/null 2>&1 ; then 
-                    echo "--- Sing-box Log for $NODE_ID ($SINGBOX_NODE_LOG) ---"
-                    cat "$SINGBOX_NODE_LOG" 
-                    echo "-------------------------------------------------"
-                else
-                    echo "(Sing-box log for $NODE_ID exists but tests were ok, showing first 10 lines)"
-                    head -n 10 "$SINGBOX_NODE_LOG" 
-                fi
+                echo "--- Sing-box Log for $NODE_ID ($SINGBOX_NODE_LOG) ---"
+                cat "$SINGBOX_NODE_LOG" 
+                echo "-------------------------------------------------"
             fi
             rm -f "$SINGBOX_NODE_LOG"
 
@@ -316,8 +298,7 @@ jobs:
               --arg ping "$PING" \
               --arg download "$DOWNLOAD_SPEED" \
               --arg upload "$UPLOAD_SPEED" \
-              --arg status "$NODE_TEST_STATUS" \
-              '{name: $name, ip_address: $ip, country_code: $country, city: $city, asn_organization: $asn_org, asn_number: $asn_number, ping_ms: $ping, download_mbps: $download, upload_mbps: $upload, status: $status, timestamp: (now | strftime("%Y-%m-%dT%H:%M:%SZ"))}')
+              '{name: $name, ip_address: $ip, country_code: $country, city: $city, asn_organization: $asn_org, asn_number: $asn_number, ping_ms: $ping, download_mbps: $download, upload_mbps: $upload, status: "tested", timestamp: (now | strftime("%Y-%m-%dT%H:%M:%SZ"))}')
             
             RESULTS_JSON_ARRAY=$(echo "$RESULTS_JSON_ARRAY" | jq --argjson item "$CURRENT_NODE_JSON" '. + [$item]')
             rm -f "$TEMP_SINGBOX_CONFIG"
