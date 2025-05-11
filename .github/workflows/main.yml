@@ -30,7 +30,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y curl jq speedtest-cli yq coreutils
 
-      - name: Fetch Gist, encode, and commit encoded_subscription.txt
+      - name: Fetch Gist, encode, and prepare for commit
         id: update_encoded_file
         run: |
           GIST_URL="https://gist.githubusercontent.com/OpexDevelop/a676272468c9b6ac804092250ce9bc67/raw/opexvpn-high.txt"
@@ -45,19 +45,7 @@ jobs:
           rm original_sub_content.tmp
           echo "Encoded content saved to $ENCODED_FILE_NAME"
           echo "encoded_file_name=$ENCODED_FILE_NAME" >> $GITHUB_OUTPUT
-          git config --global user.name 'GitHub Actions Bot'
-          git config --global user.email 'github-actions-bot@users.noreply.github.com'
-          git add "$ENCODED_FILE_NAME"
-          if ! git diff --staged --quiet; then
-            echo "Changes detected in $ENCODED_FILE_NAME. Committing and pushing..."
-            git commit -m "Update $ENCODED_FILE_NAME from Gist"
-            git push origin main 
-            echo "$ENCODED_FILE_NAME updated and pushed to repository."
-            echo "Waiting a few seconds for GitHub to process the push..."
-            sleep 15 
-          else
-            echo "No changes to $ENCODED_FILE_NAME from Gist. No push needed for this file."
-          fi
+          # Файл будет добавлен в коммит на последнем шаге
 
       - name: Download and prepare subconverter
         id: prepare_subconverter
@@ -145,28 +133,27 @@ jobs:
       - name: Fetch and process subscription from REPO file URL
         id: process_nodes
         env:
-          REPO_FILE_URL: "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.ref_name }}/${{ steps.update_encoded_file.outputs.encoded_file_name }}"
+          # Используем имя файла, которое было установлено в шаге update_encoded_file
+          ENCODED_SUB_FILENAME: ${{ steps.update_encoded_file.outputs.encoded_file_name }}
         run: |
-          SUBSCRIPTION_URL_FROM_REPO_RAW="$REPO_FILE_URL"
-          
-          echo "Using subscription URL from repository: $SUBSCRIPTION_URL_FROM_REPO_RAW"
-          SUBSCRIPTION_URL_ENCODED=$(echo -n "$SUBSCRIPTION_URL_FROM_REPO_RAW" | jq -sRr @uri)
-          
-          echo "Checking accessibility of $SUBSCRIPTION_URL_FROM_REPO_RAW..."
-          if ! curl --output /dev/null --silent --head --fail "$SUBSCRIPTION_URL_FROM_REPO_RAW"; then
-            echo "Failed to access $SUBSCRIPTION_URL_FROM_REPO_RAW. It might not be available yet after push."
-            sleep 5
-            if ! curl --output /dev/null --silent --head --fail "$SUBSCRIPTION_URL_FROM_REPO_RAW"; then
-                echo "Still failed to access $SUBSCRIPTION_URL_FROM_REPO_RAW after retry. Exiting."
-                exit 1
-            fi
-            echo "Successfully accessed $SUBSCRIPTION_URL_FROM_REPO_RAW after retry."
-          else
-            echo "$SUBSCRIPTION_URL_FROM_REPO_RAW is accessible."
+          # Используем локальный файл, так как он уже есть в рабочей директории после checkout и обновления
+          if [ ! -f "$ENCODED_SUB_FILENAME" ]; then
+            echo "CRITICAL: Encoded subscription file '$ENCODED_SUB_FILENAME' not found in workspace."
+            exit 1
           fi
+          echo "Using local encoded subscription file: $ENCODED_SUB_FILENAME"
           
-          echo "Fetching and converting subscription (from repo file URL, content is base64) to Clash format..."
-          if ! curl --fail -sL "http://127.0.0.1:25500/sub?target=clash&url=${SUBSCRIPTION_URL_ENCODED}&base64=true" -o sub_clash_config.yaml; then
+          BASE64_CONTENT_FROM_FILE=$(cat "$ENCODED_SUB_FILENAME")
+          if [ -z "$BASE64_CONTENT_FROM_FILE" ]; then
+            echo "Error: The file $ENCODED_SUB_FILENAME is empty."
+            exit 1
+          fi
+
+          DATA_URI_PAYLOAD="data:text/plain;base64,${BASE64_CONTENT_FROM_FILE}"
+          SUBSCRIPTION_DATA_ENCODED=$(echo -n "$DATA_URI_PAYLOAD" | jq -sRr @uri)
+          
+          echo "Fetching and converting subscription (from local base64 file via data URI) to Clash format..."
+          if ! curl --fail -sL "http://127.0.0.1:25500/sub?target=clash&url=${SUBSCRIPTION_DATA_ENCODED}" -o sub_clash_config.yaml; then
             CURL_EXIT_CODE_SUB=$?
             echo "Curl command failed to get subscription from subconverter. Exit code: $CURL_EXIT_CODE_SUB"
             cat subconverter.log 
@@ -232,7 +219,7 @@ jobs:
                 CURRENT_NODE_JSON=$(jq -n --arg name "$NODE_NAME_RAW" --arg error "Sing-box failed to start" '{name: $name, status: "error", error: $error, timestamp: (now | strftime("%Y-%m-%dT%H:%M:%SZ"))}')
                 RESULTS_JSON_ARRAY=$(echo "$RESULTS_JSON_ARRAY" | jq --argjson item "$CURRENT_NODE_JSON" '. + [$item]')
                 rm -f "$TEMP_SINGBOX_CONFIG" "$SINGBOX_NODE_LOG"
-                NODE_TEST_SUCCESS=false # Отмечаем ошибку
+                NODE_TEST_SUCCESS=false 
             fi
             
             if [ "$NODE_TEST_SUCCESS" = true ]; then
@@ -284,13 +271,13 @@ jobs:
                 echo "Download: $DOWNLOAD_SPEED Mbit/s"
                 echo "Upload: $UPLOAD_SPEED Mbit/s"
                 echo "--------------------------------------------------"
-            fi # End of if NODE_TEST_SUCCESS is true
+            fi 
 
-            if ps -p $SINGBOX_PID > /dev/null; then # Если sing-box все еще работает (или был запущен)
+            if ps -p $SINGBOX_PID > /dev/null; then 
                 echo "Stopping Sing-box for $NODE_ID (PID $SINGBOX_PID)..."
                 kill -SIGTERM $SINGBOX_PID || echo "Failed to send SIGTERM to Sing-box"
                 n=0
-                while ps -p $SINGBOX_PID > /dev/null && [ $n -lt 3 ]; do # Уменьшаем ожидание до 3 секунд
+                while ps -p $SINGBOX_PID > /dev/null && [ $n -lt 3 ]; do 
                   sleep 1
                   n=$((n+1))
                 done
@@ -309,15 +296,21 @@ jobs:
                 echo "Sing-box log for $NODE_ID is empty or not found."
             fi
             rm -f "$SINGBOX_NODE_LOG"
+            
+            # Собираем JSON для узла
+            # Если NODE_TEST_SUCCESS false, но IP_ADDRESS не N/A, значит speedtest упал, но IP получили
+            # Если NODE_TEST_SUCCESS false и IP_ADDRESS N/A, значит и IP тест упал
+            ERROR_MESSAGE=""
+            if [ "$NODE_TEST_SUCCESS" = false ]; then
+                if [ "$IP_ADDRESS" = "N/A" ]; then
+                    ERROR_MESSAGE="IP test failed"
+                else
+                    ERROR_MESSAGE="Speedtest failed"
+                fi
+            fi
 
-            # Собираем JSON даже если тесты упали, чтобы записать ошибку или N/A
-            if [ "$NODE_TEST_SUCCESS" = false ] && [ ! -f TEMP_SINGBOX_CONFIG ]; then # Если sing-box даже не стартанул
+            if [ "$NODE_TEST_SUCCESS" = true ]; then
                  CURRENT_NODE_JSON=$(jq -n \
-                    --arg name "$NODE_NAME_RAW" \
-                    --arg error_msg "$(jq -r .error TEMP_SINGBOX_CONFIG 2>/dev/null || echo 'Sing-box start failed or test failed before IP check')" \
-                    '{name: $name, status: "error", error: $error_msg, timestamp: (now | strftime("%Y-%m-%dT%H:%M:%SZ"))}')
-            else
-                CURRENT_NODE_JSON=$(jq -n \
                   --arg name "$NODE_NAME_RAW" \
                   --arg ip "$IP_ADDRESS" \
                   --arg country "$COUNTRY" \
@@ -328,6 +321,19 @@ jobs:
                   --arg download "$DOWNLOAD_SPEED" \
                   --arg upload "$UPLOAD_SPEED" \
                   '{name: $name, ip_address: $ip, country_code: $country, city: $city, asn_organization: $asn_org, asn_number: $asn_number, ping_ms: $ping, download_mbps: $download, upload_mbps: $upload, status: "tested", timestamp: (now | strftime("%Y-%m-%dT%H:%M:%SZ"))}')
+            else
+                 CURRENT_NODE_JSON=$(jq -n \
+                  --arg name "$NODE_NAME_RAW" \
+                  --arg ip "$IP_ADDRESS" \
+                  --arg country "$COUNTRY" \
+                  --arg city "$CITY" \
+                  --arg asn_org "$ASN_ORG" \
+                  --arg asn_number "$ASN_NUMBER" \
+                  --arg ping "$PING" \
+                  --arg download "$DOWNLOAD_SPEED" \
+                  --arg upload "$UPLOAD_SPEED" \
+                  --arg error_msg "$ERROR_MESSAGE" \
+                  '{name: $name, ip_address: $ip, country_code: $country, city: $city, asn_organization: $asn_org, asn_number: $asn_number, ping_ms: $ping, download_mbps: $download, upload_mbps: $upload, status: "error", error: $error_msg, timestamp: (now | strftime("%Y-%m-%dT%H:%M:%SZ"))}')
             fi
             
             RESULTS_JSON_ARRAY=$(echo "$RESULTS_JSON_ARRAY" | jq --argjson item "$CURRENT_NODE_JSON" '. + [$item]')
@@ -344,10 +350,11 @@ jobs:
         run: |
           git config --global user.name 'GitHub Actions Bot'
           git config --global user.email 'github-actions-bot@users.noreply.github.com'
+          # Добавляем оба файла, если они изменились (encoded_subscription.txt уже добавлен в индекс на предыдущем шаге)
           git add proxy_results.json 
-          if ! git diff --staged --quiet; then
-            git commit -m "Update proxy test results ($(date -u +'%Y-%m-%d %H:%M:%S UTC'))"
+          if ! git diff --staged --quiet HEAD -- "$ENCODED_FILE_NAME" "$PROXY_RESULTS_JSON"; then # Проверяем изменения в обоих файлах
+            git commit -m "Update proxy test results and encoded Gist ($(date -u +'%Y-%m-%d %H:%M:%S UTC'))"
             git push
           else
-            echo "No changes to proxy results."
+            echo "No changes to proxy results or encoded Gist."
           fi
