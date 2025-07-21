@@ -1,0 +1,47 @@
+name: Proxy Connection Tester
+
+# Этот воркфлоу запускается только вручную со страницы Actions
+on:
+  workflow_dispatch:
+
+jobs:
+  test-proxies:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Клонируем репозиторий, чтобы получить доступ к файлам
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      # 2. Устанавливаем Node.js нужной версии
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # 3. Устанавливаем зависимости для скрипта, включая singbox-converter
+      - name: Install dependencies
+        run: npm install @opexdevelop/singbox-converter node-fetch
+
+      # 4. Скачиваем и распаковываем sing-box указанной версии
+      - name: Download and install sing-box
+        run: |
+          wget https://github.com/SagerNet/sing-box/releases/download/v1.11.15/sing-box-1.11.15-linux-amd64.tar.gz
+          tar -xzf sing-box-1.11.15-linux-amd64.tar.gz
+          mv sing-box-1.11.15-linux-amd64/sing-box .
+          chmod +x ./sing-box
+
+      # 5. Запускаем наш основной скрипт для тестирования
+      - name: Run connection tests
+        run: node ./run-tests.js
+
+      # 6. Коммитим и пушим полученный tested.json в репозиторий
+      - name: Commit and push results
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: Update tested proxy results"
+          file_pattern: tested.json
+          commit_user_name: GitHub Actions Bot
+          commit_user_email: actions@github.com
+          commit_author: GitHub Actions Bot <actions@github.com>
