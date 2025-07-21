@@ -1,0 +1,10 @@
+{
+  "name": "proxy-tester",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@opexdevelop/singbox-converter": "^1.0.1",
+    "node-fetch": "^3.3.2"
+  }
+}
