@@ -1,6 +1,5 @@
 name: Proxy Connection Tester
 
-# Этот воркфлоу запускается только вручную со страницы Actions
 on:
   workflow_dispatch:
 
@@ -9,22 +8,36 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Клонируем репозиторий, чтобы получить доступ к файлам
+      # 1. Клонируем репозиторий
       - name: Check out repository code
         uses: actions/checkout@v4
 
-      # 2. Устанавливаем Node.js нужной версии
+      # 2. Устанавливаем Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
 
-      # 3. Устанавливаем зависимости для скрипта, включая singbox-converter
+      # 3. Настраиваем умное кэширование для зависимостей
+      # Этот шаг ищет кэш по хэшу файла package.json.
+      # Если package.json не менялся, он восстанавливает node_modules из кэша.
+      - name: Cache dependencies
+        id: cache-npm
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      # 4. Устанавливаем зависимости.
+      # Если кэш не был найден, эта команда установит всё с нуля и создаст package-lock.json (только внутри воркфлоу).
+      # Если кэш был найден, команда выполнится очень быстро.
       - name: Install dependencies
-        run: npm install @opexdevelop/singbox-converter node-fetch
+        if: steps.cache-npm.outputs.cache-hit != 'true'
+        run: npm install
 
-      # 4. Скачиваем и распаковываем sing-box указанной версии
+      # 5. Скачиваем и устанавливаем sing-box
       - name: Download and install sing-box
         run: |
           wget https://github.com/SagerNet/sing-box/releases/download/v1.11.15/sing-box-1.11.15-linux-amd64.tar.gz
@@ -32,11 +45,11 @@ jobs:
           mv sing-box-1.11.15-linux-amd64/sing-box .
           chmod +x ./sing-box
 
-      # 5. Запускаем наш основной скрипт для тестирования
+      # 6. Запускаем наш основной скрипт для тестирования
       - name: Run connection tests
         run: node ./run-tests.js
 
-      # 6. Коммитим и пушим полученный tested.json в репозиторий
+      # 7. Коммитим и пушим полученный tested.json в репозиторий
       - name: Commit and push results
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
@@ -45,3 +58,4 @@ jobs:
           commit_user_name: GitHub Actions Bot
           commit_user_email: actions@github.com
           commit_author: GitHub Actions Bot <actions@github.com>
+          
