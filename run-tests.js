@@ -1,4 +1,4 @@
-import { convertLinksToOutbounds } from '@opexdevelop/singbox-converter';
+import { convertLinksToOutbounds } from 'singbox-converter';
 import { promises as fs } from 'fs';
 import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
