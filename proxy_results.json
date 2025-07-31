@@ -6,12 +6,12 @@
     "city": "N/A",
     "asn_organization": "N/A",
     "asn_number": "N/A",
-    "ping_ms": "10.417",
-    "download_mbps": "1997.65",
-    "upload_mbps": "1824.16",
+    "ping_ms": "27.266",
+    "download_mbps": "1889.90",
+    "upload_mbps": "1003.43",
     "status": "error",
     "error": "IP test failed/timeout",
-    "timestamp": "2025-07-30T00:49:25Z"
+    "timestamp": "2025-07-31T00:49:13Z"
   },
   {
     "name": "1 🇱🇻 TrojanGFW [t.me/ryukohk]",
@@ -20,12 +20,12 @@
     "city": "N/A",
     "asn_organization": "N/A",
     "asn_number": "N/A",
-    "ping_ms": "76.895",
-    "download_mbps": "311.76",
-    "upload_mbps": "105.72",
+    "ping_ms": "14.155",
+    "download_mbps": "1840.08",
+    "upload_mbps": "1112.03",
     "status": "error",
     "error": "IP test failed/timeout",
-    "timestamp": "2025-07-30T00:49:57Z"
+    "timestamp": "2025-07-31T00:49:26Z"
   },
   {
     "name": "1 🇱🇻 VMess (unlimited internet abuse: whatsapp.com) [t.me/ryukohk]",
@@ -34,12 +34,12 @@
     "city": "N/A",
     "asn_organization": "N/A",
     "asn_number": "N/A",
-    "ping_ms": "66.362",
-    "download_mbps": "318.16",
-    "upload_mbps": "137.05",
+    "ping_ms": "14.052",
+    "download_mbps": "1910.62",
+    "upload_mbps": "1078.25",
     "status": "error",
     "error": "IP test failed/timeout",
-    "timestamp": "2025-07-30T00:50:27Z"
+    "timestamp": "2025-07-31T00:49:39Z"
   },
   {
     "name": "DE · Aeza · DeVpn S-2.2",
@@ -48,12 +48,12 @@
     "city": "N/A",
     "asn_organization": "N/A",
     "asn_number": "N/A",
-    "ping_ms": "10.169",
-    "download_mbps": "1955.02",
-    "upload_mbps": "1794.47",
+    "ping_ms": "14.999",
+    "download_mbps": "1850.92",
+    "upload_mbps": "1131.56",
     "status": "error",
     "error": "IP test failed/timeout",
-    "timestamp": "2025-07-30T00:50:40Z"
+    "timestamp": "2025-07-31T00:49:52Z"
   },
   {
     "name": "DE · Aeza · DeVpn S-2.1",
@@ -62,12 +62,12 @@
     "city": "N/A",
     "asn_organization": "N/A",
     "asn_number": "N/A",
-    "ping_ms": "65.822",
-    "download_mbps": "406.32",
-    "upload_mbps": "288.39",
+    "ping_ms": "15.093",
+    "download_mbps": "1836.65",
+    "upload_mbps": "1294.57",
     "status": "error",
     "error": "IP test failed/timeout",
-    "timestamp": "2025-07-30T00:51:03Z"
+    "timestamp": "2025-07-31T00:50:05Z"
   },
   {
     "name": "Нидерланды🇳🇱",
@@ -76,11 +76,11 @@
     "city": "Amsterdam (Amsterdam-Noord)",
     "asn_organization": "Greenhost BV",
     "asn_number": "AS47172",
-    "ping_ms": "66.071",
-    "download_mbps": "465.22",
-    "upload_mbps": "245.22",
+    "ping_ms": "15.083",
+    "download_mbps": "1903.60",
+    "upload_mbps": "1088.74",
     "status": "tested",
-    "timestamp": "2025-07-30T00:51:27Z"
+    "timestamp": "2025-07-31T00:50:18Z"
   },
   {
     "name": "США🇺🇸",
@@ -89,12 +89,12 @@
     "city": "N/A",
     "asn_organization": "N/A",
     "asn_number": "N/A",
-    "ping_ms": "65.758",
-    "download_mbps": "395.95",
-    "upload_mbps": "291.30",
+    "ping_ms": "15.124",
+    "download_mbps": "1899.68",
+    "upload_mbps": "1205.82",
     "status": "error",
     "error": "IP test failed/timeout",
-    "timestamp": "2025-07-30T00:52:00Z"
+    "timestamp": "2025-07-31T00:50:41Z"
   },
   {
     "name": "Канада🇨🇦",
@@ -103,11 +103,11 @@
     "city": "Montreal (Ville-Marie)",
     "asn_organization": "OVH SAS",
     "asn_number": "AS16276",
-    "ping_ms": "66.348",
-    "download_mbps": "517.23",
-    "upload_mbps": "204.50",
+    "ping_ms": "15.132",
+    "download_mbps": "1898.17",
+    "upload_mbps": "988.24",
     "status": "tested",
-    "timestamp": "2025-07-30T00:52:24Z"
+    "timestamp": "2025-07-31T00:50:54Z"
   },
   {
     "name": "Нидерланды🇳🇱 2",
@@ -116,11 +116,11 @@
     "city": "Amsterdam",
     "asn_organization": "Datacamp Limited",
     "asn_number": "AS212238",
-    "ping_ms": "1.617",
-    "download_mbps": "1965.60",
-    "upload_mbps": "1784.50",
+    "ping_ms": "15.09",
+    "download_mbps": "1547.80",
+    "upload_mbps": "1191.51",
     "status": "tested",
-    "timestamp": "2025-07-30T00:52:36Z"
+    "timestamp": "2025-07-31T00:51:07Z"
   },
   {
     "name": "Нидерланды🇳🇱 3",
@@ -129,11 +129,11 @@
     "city": "Amsterdam",
     "asn_organization": "Datacamp Limited",
     "asn_number": "AS212238",
-    "ping_ms": "65.97",
-    "download_mbps": "544.50",
-    "upload_mbps": "279.01",
+    "ping_ms": "15.086",
+    "download_mbps": "1860.89",
+    "upload_mbps": "1166.72",
     "status": "tested",
-    "timestamp": "2025-07-30T00:52:58Z"
+    "timestamp": "2025-07-31T00:51:20Z"
   },
   {
     "name": "Нидерланды🇳🇱 4",
@@ -142,11 +142,11 @@
     "city": "Amsterdam",
     "asn_organization": "Datacamp Limited",
     "asn_number": "AS212238",
-    "ping_ms": "65.972",
-    "download_mbps": "541.48",
-    "upload_mbps": "108.90",
+    "ping_ms": "14.988",
+    "download_mbps": "1909.54",
+    "upload_mbps": "1123.07",
     "status": "tested",
-    "timestamp": "2025-07-30T00:53:26Z"
+    "timestamp": "2025-07-31T00:51:33Z"
   },
   {
     "name": "Нидерланды🇳🇱 5",
@@ -155,11 +155,11 @@
     "city": "Amsterdam",
     "asn_organization": "Datacamp Limited",
     "asn_number": "AS212238",
-    "ping_ms": "65.839",
-    "download_mbps": "524.66",
-    "upload_mbps": "283.09",
+    "ping_ms": "14.929",
+    "download_mbps": "1911.47",
+    "upload_mbps": "1099.86",
     "status": "tested",
-    "timestamp": "2025-07-30T00:53:48Z"
+    "timestamp": "2025-07-31T00:51:46Z"
   },
   {
     "name": "Финляндия🇫🇮",
@@ -168,12 +168,12 @@
     "city": "N/A",
     "asn_organization": "N/A",
     "asn_number": "N/A",
-    "ping_ms": "66.541",
-    "download_mbps": "524.19",
-    "upload_mbps": "287.50",
+    "ping_ms": "14.135",
+    "download_mbps": "1849.18",
+    "upload_mbps": "844.91",
     "status": "error",
     "error": "IP test failed/timeout",
-    "timestamp": "2025-07-30T00:54:14Z"
+    "timestamp": "2025-07-31T00:52:04Z"
   },
   {
     "name": "Германия🇩🇪",
@@ -182,12 +182,12 @@
     "city": "N/A",
     "asn_organization": "N/A",
     "asn_number": "N/A",
-    "ping_ms": "65.952",
-    "download_mbps": "507.04",
-    "upload_mbps": "283.10",
+    "ping_ms": "14.163",
+    "download_mbps": "1220.52",
+    "upload_mbps": "1260.34",
     "status": "error",
     "error": "IP test failed/timeout",
-    "timestamp": "2025-07-30T00:54:36Z"
+    "timestamp": "2025-07-31T00:52:17Z"
   },
   {
     "name": "Франция🇫🇷",
@@ -196,12 +196,12 @@
     "city": "N/A",
     "asn_organization": "N/A",
     "asn_number": "N/A",
-    "ping_ms": "65.769",
-    "download_mbps": "534.84",
-    "upload_mbps": "263.67",
+    "ping_ms": "14.259",
+    "download_mbps": "1853.74",
+    "upload_mbps": "1102.55",
     "status": "error",
     "error": "IP test failed/timeout",
-    "timestamp": "2025-07-30T00:55:03Z"
+    "timestamp": "2025-07-31T00:52:35Z"
   },
   {
     "name": "Нидерланды🇳🇱 6",
@@ -210,12 +210,12 @@
     "city": "N/A",
     "asn_organization": "N/A",
     "asn_number": "N/A",
-    "ping_ms": "65.972",
-    "download_mbps": "533.91",
-    "upload_mbps": "293.12",
+    "ping_ms": "14.983",
+    "download_mbps": "1929.57",
+    "upload_mbps": "1104.22",
     "status": "error",
     "error": "IP test failed/timeout",
-    "timestamp": "2025-07-30T00:55:29Z"
+    "timestamp": "2025-07-31T00:52:53Z"
   },
   {
     "name": "Венгрия🇭🇺",
@@ -224,12 +224,12 @@
     "city": "N/A",
     "asn_organization": "N/A",
     "asn_number": "N/A",
-    "ping_ms": "65.791",
-    "download_mbps": "542.68",
-    "upload_mbps": "173.70",
+    "ping_ms": "14.737",
+    "download_mbps": "1831.29",
+    "upload_mbps": "1177.96",
     "status": "error",
     "error": "IP test failed/timeout",
-    "timestamp": "2025-07-30T00:55:58Z"
+    "timestamp": "2025-07-31T00:53:10Z"
   },
   {
     "name": "Франция🇫🇷 2",
@@ -238,12 +238,12 @@
     "city": "N/A",
     "asn_organization": "N/A",
     "asn_number": "N/A",
-    "ping_ms": "65.952",
-    "download_mbps": "536.83",
-    "upload_mbps": "267.07",
+    "ping_ms": "14.133",
+    "download_mbps": "1899.94",
+    "upload_mbps": "1174.31",
     "status": "error",
     "error": "IP test failed/timeout",
-    "timestamp": "2025-07-30T00:56:20Z"
+    "timestamp": "2025-07-31T00:53:23Z"
   },
   {
     "name": "США🇺🇸 2",
@@ -252,12 +252,12 @@
     "city": "N/A",
     "asn_organization": "N/A",
     "asn_number": "N/A",
-    "ping_ms": "65.525",
-    "download_mbps": "432.95",
-    "upload_mbps": "152.27",
+    "ping_ms": "14.225",
+    "download_mbps": "1884.77",
+    "upload_mbps": "1088.39",
     "status": "error",
     "error": "IP test failed/timeout",
-    "timestamp": "2025-07-30T00:56:48Z"
+    "timestamp": "2025-07-31T00:53:35Z"
   },
   {
     "name": "Сингапур🇸🇬",
@@ -266,11 +266,11 @@
     "city": "Singapore",
     "asn_organization": "M247 Europe SRL",
     "asn_number": "AS9009",
-    "ping_ms": "65.761",
-    "download_mbps": "484.17",
-    "upload_mbps": "289.51",
+    "ping_ms": "14.097",
+    "download_mbps": "1824.30",
+    "upload_mbps": "1142.67",
     "status": "tested",
-    "timestamp": "2025-07-30T00:57:10Z"
+    "timestamp": "2025-07-31T00:53:49Z"
   },
   {
     "name": "Гонконг🇭🇰",
@@ -279,12 +279,12 @@
     "city": "N/A",
     "asn_organization": "N/A",
     "asn_number": "N/A",
-    "ping_ms": "66.052",
-    "download_mbps": "491.34",
-    "upload_mbps": "288.52",
+    "ping_ms": "14.09",
+    "download_mbps": "1956.19",
+    "upload_mbps": "1300.15",
     "status": "error",
     "error": "IP test failed/timeout",
-    "timestamp": "2025-07-30T00:57:37Z"
+    "timestamp": "2025-07-31T00:54:06Z"
   },
   {
     "name": "Нидерланды🇳🇱 7",
@@ -293,10 +293,10 @@
     "city": "Amsterdam (Amsterdam-Noord)",
     "asn_organization": "Greenhost BV",
     "asn_number": "AS47172",
-    "ping_ms": "66.098",
-    "download_mbps": "509.65",
-    "upload_mbps": "278.38",
+    "ping_ms": "15.155",
+    "download_mbps": "1918.78",
+    "upload_mbps": "1086.32",
     "status": "tested",
-    "timestamp": "2025-07-30T00:58:00Z"
+    "timestamp": "2025-07-31T00:54:19Z"
   }
 ]
