@@ -24,7 +24,7 @@ function isRussianServer(proxy) {
     if (proxy.flag === '🇷🇺') return true;
     
     // Если поля пустые, проверяем в checks
-    if (!proxy.country && !proxy.flag && proxy.checks && proxy.checks.length > 0) {
+    if ((!proxy.country || proxy.country === 'Unknown') && proxy.checks && proxy.checks.length > 0) {
         // Ищем последний check с country
         for (let i = proxy.checks.length - 1; i >= 0; i--) {
             const check = proxy.checks[i];
@@ -47,27 +47,25 @@ function createCustomName(proxy) {
     let isPro = proxy.isPro || false;
     let provider = proxy.provider || 'unknown';
     
-    // Если флаг пустой, пробуем получить из последнего check
-    if (!flag && proxy.checks && proxy.checks.length > 0) {
+    // Если флаг пустой или страна Unknown, пробуем получить из последнего check
+    if ((!flag || flag === '🌐' || !country || country === 'Unknown') && proxy.checks && proxy.checks.length > 0) {
         for (let i = proxy.checks.length - 1; i >= 0; i--) {
             const check = proxy.checks[i];
-            if (check.country) {
+            if (check.country && check.country !== 'Unknown') {
                 flag = getFlagEmoji(check.country);
-                if (!country) {
-                    country = check.country;
-                }
+                country = check.country; // Используем код страны как название
                 break;
             }
         }
     }
     
     // Если все еще нет флага
-    if (!flag) flag = '❓';
+    if (!flag || flag === '🌐') flag = '❓';
     
     // Если нет страны, используем код страны
     if (!country && countryCode) {
         country = countryCode;
-    } else if (!country) {
+    } else if (!country || country === 'Unknown') {
         country = 'Unknown';
     }
     
@@ -87,9 +85,9 @@ function createCustomName(proxy) {
         name += ` ${used}/${limit}`;
     }
     
-    // Добавляем префикс pro- если нужно
+    // Добавляем провайдера с правильным форматом
     if (isPro) {
-        name += ` pro-${provider}`;
+        name += ` ${provider}-pro`; // Изменено с pro-provider на provider-pro
     } else {
         name += ` ${provider}`;
     }
@@ -217,6 +215,8 @@ export async function formatAndSaveSubscriptions(database) {
             path.join(CHECKED_DIR, 'providers', `${provider}-base64.txt`),
             base64Content
         );
+        
+        console.log(`Saved ${links.length} non-Russian links for provider: ${provider}`);
     }
     
     // Сохраняем файлы провайдеров (только русские)
@@ -257,6 +257,8 @@ export async function formatAndSaveSubscriptions(database) {
             path.join(CHECKED_DIR, 'levels', `${level}-base64.txt`),
             base64Content
         );
+        
+        console.log(`Saved ${links.length} non-Russian links for level: ${level}`);
     }
     
     // Сохраняем файлы уровней (только русские)
