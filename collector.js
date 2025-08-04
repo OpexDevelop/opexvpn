@@ -1,10 +1,113 @@
 import fetch from 'node-fetch';
 import https from 'https';
 import { URL } from 'url';
+import { spawn } from 'child_process';
+import { writeFile } from 'fs/promises';
+import { exec as execCallback } from 'child_process';
+import { promisify } from 'util';
+import { HttpsProxyAgent } from 'https-proxy-agent';
+import { SocksProxyAgent } from 'socks-proxy-agent';
+
+const exec = promisify(execCallback);
 
 const httpsAgent = new https.Agent({
     rejectUnauthorized: false
 });
+
+// WARP конфигурация для Singbox
+const WARP_CONFIG = {
+    log: {
+        level: "error"
+    },
+    inbounds: [{
+        type: "socks",
+        tag: "socks-in",
+        listen: "127.0.0.1",
+        listen_port: 30000,
+        sniff: false
+    }],
+    outbounds: [{
+        "local_address": [
+            "172.16.0.2/32",
+            "2606:4700:110:8ee5:7fdc:c702:9d12:ac0b/128"
+        ],
+        "mtu": 1280,
+        "peer_public_key": "bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=",
+        "pre_shared_key": "",
+        "private_key": "aKYezQKQhne0c4Dp+72PDSQWF+TOJXy2Y1+yqUCN5HU=",
+        "reserved": "QTEG",
+        "server": "188.114.97.97",
+        "server_port": 500,
+        "type": "wireguard",
+        "tag": "warp"
+    }],
+    route: {
+        rules: [{
+            inbound: ["socks-in"],
+            outbound: "warp"
+        }]
+    }
+};
+
+let warpProcess = null;
+let warpAgent = null;
+
+// Запуск WARP через Singbox
+async function startWarp() {
+    if (warpProcess) return;
+    
+    console.log('Starting WARP proxy for lagomvpn...');
+    
+    // Сохраняем конфигурацию
+    const configPath = './warp_config_temp.json';
+    await writeFile(configPath, JSON.stringify(WARP_CONFIG, null, 2));
+    
+    return new Promise((resolve, reject) => {
+        warpProcess = spawn('sing-box', ['run', '-c', configPath], {
+            stdio: ['ignore', 'pipe', 'pipe']
+        });
+        
+        let started = false;
+        const checkStarted = (data) => {
+            const output = data.toString();
+            if (!started && (output.includes('started') || output.includes('listening'))) {
+                started = true;
+                warpAgent = new SocksProxyAgent('socks5://127.0.0.1:30000');
+                setTimeout(() => resolve(), 2000);
+            }
+        };
+        
+        warpProcess.stdout.on('data', checkStarted);
+        warpProcess.stderr.on('data', checkStarted);
+        
+        warpProcess.on('error', reject);
+        
+        // Даем время на запуск
+        setTimeout(() => {
+            if (!started) {
+                warpAgent = new SocksProxyAgent('socks5://127.0.0.1:30000');
+                resolve();
+            }
+        }, 5000);
+    });
+}
+
+// Остановка WARP
+async function stopWarp() {
+    if (warpProcess) {
+        warpProcess.kill('SIGTERM');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        try {
+            process.kill(warpProcess.pid, 0);
+            warpProcess.kill('SIGKILL');
+        } catch (e) {
+            // Process already dead
+        }
+        warpProcess = null;
+        warpAgent = null;
+        await exec('rm -f ./warp_config_temp.json').catch(() => {});
+    }
+}
 
 // Парсеры для разных провайдеров
 const PARSERS = {
@@ -14,7 +117,8 @@ const PARSERS = {
     },
     lagomvpn: {
         detect: (url) => url.includes('williamsbakery.life'),
-        parse: parseLagomSubscription
+        parse: parseLagomSubscription,
+        requiresWarp: true
     },
     tgvpnbot: {
         detect: (url) => url.includes('tgvpnbot.com'),
@@ -293,17 +397,30 @@ async function parseTgvpnbotSubscription(url, content) {
     }
 }
 
-async function fetchSubscription(url) {
+async function fetchSubscription(url, useWarp = false) {
     try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 10000);
+        const timeout = setTimeout(() => controller.abort(), 15000);
         
-        const response = await fetch(url, {
-            agent: url.startsWith('https') ? httpsAgent : undefined,
+        const fetchOptions = {
             signal: controller.signal
-        });
+        };
+        
+        // Используем WARP агент если требуется
+        if (useWarp && warpAgent) {
+            fetchOptions.agent = warpAgent;
+        } else if (!useWarp) {
+            fetchOptions.agent = url.startsWith('https') ? httpsAgent : undefined;
+        }
+        
+        const response = await fetch(url, fetchOptions);
         
         clearTimeout(timeout);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
         const content = await response.text();
         
         // Пробуем декодировать как base64
@@ -333,22 +450,40 @@ export async function collectLinks(sourceUrl, level = 'high') {
             .split('\n')
             .filter(line => line.trim());
         
+        // Проверяем, нужен ли WARP для каких-либо источников
+        const needsWarp = sources.some(source => {
+            for (const [name, config] of Object.entries(PARSERS)) {
+                if (config.detect(source) && config.requiresWarp) {
+                    return true;
+                }
+            }
+            return false;
+        });
+        
+        // Запускаем WARP если нужно
+        if (needsWarp) {
+            await startWarp();
+        }
+        
         const allServers = [];
         
         for (const source of sources) {
             try {
                 if (source.startsWith('http://') || source.startsWith('https://')) {
-                    // Это подписка
-                    const content = await fetchSubscription(source);
-                    
                     // Определяем парсер
                     let parser = null;
+                    let requiresWarp = false;
+                    
                     for (const [name, config] of Object.entries(PARSERS)) {
                         if (config.detect(source)) {
                             parser = config;
+                            requiresWarp = config.requiresWarp || false;
                             break;
                         }
                     }
+                    
+                    // Это подписка
+                    const content = await fetchSubscription(source, requiresWarp);
                     
                     if (parser) {
                         const servers = await parser.parse(source, content);
@@ -388,6 +523,11 @@ export async function collectLinks(sourceUrl, level = 'high') {
             } catch (error) {
                 console.error(`Error processing source ${source}:`, error.message);
             }
+        }
+        
+        // Останавливаем WARP
+        if (needsWarp) {
+            await stopWarp();
         }
         
         // Для lagomvpn проверяем лимиты трафика и выбираем только один аккаунт
@@ -444,5 +584,8 @@ export async function collectLinks(sourceUrl, level = 'high') {
     } catch (error) {
         console.error('Error collecting links:', error);
         return [];
+    } finally {
+        // Гарантируем остановку WARP в любом случае
+        await stopWarp();
     }
 }
