@@ -5,6 +5,7 @@
   "type": "module",
   "dependencies": {
     "singbox-converter": "^1.0.8",
-    "node-fetch": "^3.3.2"
+    "node-fetch": "^3.3.2",
+    "socks-proxy-agent": "^8.0.2"
   }
 }
