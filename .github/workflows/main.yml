@@ -80,9 +80,9 @@ jobs:
         run: |
           if ! git diff --staged --quiet; then
             git commit -m "Update proxy test results ($(date -u +'%Y-%m-%d %H:%M:%S UTC'))"
-            
-            # Force push чтобы не сохранять историю
-            git push --force-with-lease https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} HEAD:${{ github.ref_name }}
+      
+            # Force push без lease проверки
+            git push --force https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} HEAD:${{ github.ref_name }}
           else
             echo "No changes to test results."
           fi
