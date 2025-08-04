@@ -5,6 +5,20 @@ import { formatAndSaveSubscriptions } from './formatter.js';
 
 const DB_FILE = './db.json';
 
+// Функция для нормализации ссылки (убираем изменяющиеся параметры)
+function normalizeLink(link) {
+    try {
+        const url = new URL(link.split('#')[0]);
+        // Удаляем параметр spx для tgvpnbot, так как он меняется
+        if (url.hostname.includes('tgvpnbot.com')) {
+            url.searchParams.delete('spx');
+        }
+        return url.toString();
+    } catch (e) {
+        return link.split('#')[0];
+    }
+}
+
 async function loadDatabase() {
     try {
         const data = await readFile(DB_FILE, 'utf-8');
@@ -41,11 +55,19 @@ export async function runProxyTests() {
     const database = await loadDatabase();
     const now = new Date().toISOString();
     
+    // Создаем мапу существующих серверов для быстрого поиска
+    const existingServersMap = new Map();
+    database.forEach(server => {
+        existingServersMap.set(normalizeLink(server.link), server);
+    });
+    
     // Обновляем базу данных новыми серверами
     for (const server of collectedServers) {
-        let proxyEntry = database.find(p => p.link === server.link);
+        const normalizedLink = normalizeLink(server.link);
+        let proxyEntry = existingServersMap.get(normalizedLink);
         
         if (!proxyEntry) {
+            // Новый сервер
             proxyEntry = {
                 status: 'pending',
                 created_at: now,
@@ -53,15 +75,42 @@ export async function runProxyTests() {
                 ...server
             };
             database.push(proxyEntry);
+            existingServersMap.set(normalizedLink, proxyEntry);
         } else {
-            // Обновляем информацию
+            // Обновляем существующий сервер
+            // ВАЖНО: обновляем trafficUsed и trafficLimit для lagomvpn
+            if (server.provider === 'lagomvpn') {
+                proxyEntry.trafficUsed = server.trafficUsed;
+                proxyEntry.trafficLimit = server.trafficLimit;
+                proxyEntry.trafficInfo = server.trafficInfo;
+            }
+            
+            // Обновляем остальные поля, но сохраняем историю
             Object.assign(proxyEntry, {
                 ...server,
                 status: proxyEntry.status,
                 created_at: proxyEntry.created_at,
-                checks: proxyEntry.checks
+                checks: proxyEntry.checks,
+                link: server.link, // Обновляем link на случай изменения параметров
+                // Сохраняем обновленную информацию о трафике
+                trafficUsed: server.trafficUsed || proxyEntry.trafficUsed,
+                trafficLimit: server.trafficLimit || proxyEntry.trafficLimit,
+                trafficInfo: server.trafficInfo || proxyEntry.trafficInfo
             });
         }
+    }
+    
+    // Удаляем серверы, которых больше нет в источниках
+    const collectedLinks = new Set(collectedServers.map(s => normalizeLink(s.link)));
+    const toRemove = [];
+    for (let i = database.length - 1; i >= 0; i--) {
+        if (!collectedLinks.has(normalizeLink(database[i].link))) {
+            console.log(`Removing obsolete server: ${database[i].name}`);
+            toRemove.push(i);
+        }
+    }
+    for (const index of toRemove) {
+        database.splice(index, 1);
     }
     
     // Фильтруем прокси для проверки
@@ -147,4 +196,12 @@ export async function runProxyTests() {
     console.log(`  Errors: ${errors}`);
     console.log(`  Pending: ${pending}`);
     console.log(`  Traffic Exhausted: ${trafficExhausted}`);
+    
+    // Детальная статистика по lagomvpn
+    const lagomStats = database.filter(p => p.provider === 'lagomvpn');
+    const lagomPro = lagomStats.filter(p => p.isPro);
+    const lagomFree = lagomStats.filter(p => !p.isPro);
+    console.log('\nLagomVPN stats:');
+    console.log(`  PRO: ${lagomPro.length} (Working: ${lagomPro.filter(p => p.status === 'working').length})`);
+    console.log(`  FREE: ${lagomFree.length} (Working: ${lagomFree.filter(p => p.status === 'working').length})`);
 }
