@@ -78,16 +78,15 @@ function createCustomName(proxy) {
     
     name += ' ·';
     
-    // Добавляем информацию о трафике для lagomvpn
-    if (proxy.provider === 'lagomvpn' && proxy.trafficUsed && proxy.trafficLimit) {
-        const used = proxy.trafficUsed.replace(/[^0-9.]/g, '');
-        const limit = proxy.trafficLimit.replace(/[^0-9.]/g, '');
-        name += ` ${used}/${limit}`;
+    // Добавляем информацию о трафике ТОЛЬКО для lagomvpn FREE (не PRO)
+    if (proxy.provider === 'lagomvpn' && !isPro && proxy.trafficUsed && proxy.trafficLimit) {
+        // Сохраняем полный формат с единицами измерения
+        name += ` ${proxy.trafficUsed}/${proxy.trafficLimit}`;
     }
     
     // Добавляем провайдера с правильным форматом
     if (isPro) {
-        name += ` ${provider}-pro`; // Изменено с pro-provider на provider-pro
+        name += ` ${provider}-pro`;
     } else {
         name += ` ${provider}`;
     }
@@ -110,38 +109,53 @@ export async function formatAndSaveSubscriptions(database) {
     // Фильтруем только работающие прокси
     const workingProxies = database.filter(p => p.status === 'working');
     
-    // Для lagomvpn проверяем лимиты трафика
-    const lagomProxies = workingProxies.filter(p => p.provider === 'lagomvpn');
+    // Для lagomvpn: все pro + серверы из одного free аккаунта
+    const lagomProProxies = workingProxies.filter(p => p.provider === 'lagomvpn' && p.isPro);
+    const lagomFreeProxies = workingProxies.filter(p => p.provider === 'lagomvpn' && !p.isPro);
     const nonLagomProxies = workingProxies.filter(p => p.provider !== 'lagomvpn');
     
-    // Группируем lagom по аккаунтам и выбираем только с доступным трафиком
-    const lagomByAccount = {};
-    lagomProxies.forEach(proxy => {
+    console.log(`Working proxies breakdown:`);
+    console.log(`- Lagom PRO: ${lagomProProxies.length}`);
+    console.log(`- Lagom FREE: ${lagomFreeProxies.length}`);
+    console.log(`- Non-Lagom: ${nonLagomProxies.length}`);
+    
+    // Группируем free lagom по аккаунтам
+    const lagomFreeByAccount = {};
+    lagomFreeProxies.forEach(proxy => {
         const username = proxy.username || 'unknown';
-        if (!lagomByAccount[username]) {
-            lagomByAccount[username] = [];
+        if (!lagomFreeByAccount[username]) {
+            lagomFreeByAccount[username] = [];
         }
-        lagomByAccount[username].push(proxy);
+        lagomFreeByAccount[username].push(proxy);
     });
     
-    let selectedLagomProxies = [];
-    for (const [username, proxies] of Object.entries(lagomByAccount)) {
+    // Выбираем один free аккаунт с доступным трафиком
+    let selectedLagomFreeProxies = [];
+    for (const [username, proxies] of Object.entries(lagomFreeByAccount)) {
         if (proxies.length > 0) {
             const sample = proxies[0];
+            console.log(`Checking Lagom FREE account ${username}: ${sample.trafficUsed}/${sample.trafficLimit}`);
+            
             if (sample.trafficUsed && sample.trafficLimit) {
                 const usedGB = parseFloat(sample.trafficUsed.replace(/[^0-9.]/g, '')) || 0;
                 const limitGB = parseFloat(sample.trafficLimit.replace(/[^0-9.]/g, '')) || 0;
                 
                 if (limitGB === 0 || usedGB < limitGB) {
-                    selectedLagomProxies = selectedLagomProxies.concat(proxies);
-                    break; // Используем только один аккаунт
+                    selectedLagomFreeProxies = proxies;
+                    console.log(`Selected Lagom FREE account: ${username}`);
+                    break;
                 }
             }
         }
     }
     
-    // Объединяем прокси
-    const finalWorkingProxies = [...nonLagomProxies, ...selectedLagomProxies];
+    // Объединяем прокси: все non-lagom + все lagom pro + выбранные lagom free
+    const finalWorkingProxies = [...nonLagomProxies, ...lagomProProxies, ...selectedLagomFreeProxies];
+    
+    console.log(`\nTotal working proxies for export: ${finalWorkingProxies.length}`);
+    console.log(`- Non-Lagom: ${nonLagomProxies.length}`);
+    console.log(`- Lagom PRO: ${lagomProProxies.length}`);
+    console.log(`- Lagom FREE (selected): ${selectedLagomFreeProxies.length}`);
     
     // Разделяем на русские и нерусские
     const russianProxies = finalWorkingProxies.filter(isRussianServer);
