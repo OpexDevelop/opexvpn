@@ -6,6 +6,7 @@ import { writeFile } from 'fs/promises';
 import { exec as execCallback } from 'child_process';
 import { promisify } from 'util';
 import { SocksProxyAgent } from 'socks-proxy-agent';
+import { convertToOutbounds } from 'singbox-converter';
 
 const exec = promisify(execCallback);
 
@@ -26,95 +27,126 @@ async function startLagomProxy() {
     
     console.log('Starting proxy for lagomvpn subscriptions...');
     
-    // Конфигурация Singbox с vless прокси
-    const config = {
-        log: {
-            level: "error"
-        },
-        inbounds: [{
-            type: "socks",
-            tag: "socks-in",
-            listen: "127.0.0.1",
-            listen_port: LAGOM_PROXY_PORT,
-            sniff: false
-        }],
-        outbounds: [{
-            type: "vless",
-            tag: "proxy",
-            server: "217.16.16.225",
-            server_port: 443,
-            uuid: "4f297b1c-4c2b-4b23-b724-7c4379f3018a",
-            flow: "xtls-rprx-vision",
-            tls: {
-                enabled: true,
-                server_name: "www.vk.com",
-                reality: {
-                    enabled: true,
-                    public_key: "PL5TmzBOF8lJDXUp1oDM2lHMNk96fmjzmdoq0r9oFR8",
-                    short_id: "719b678d"
-                },
-                utls: {
-                    enabled: true,
-                    fingerprint: "firefox"
-                }
-            },
-            transport: {
-                type: "tcp"
-            }
-        }],
-        route: {
-            rules: [{
-                inbound: ["socks-in"],
-                outbound: "proxy"
-            }]
+    try {
+        // Конвертируем vless ссылку в outbound используя singbox-converter
+        const outbounds = await convertToOutbounds(LAGOM_PROXY_LINK);
+        if (!outbounds || outbounds.length === 0) {
+            throw new Error('Failed to convert lagom proxy link');
         }
-    };
-    
-    // Сохраняем конфигурацию
-    const configPath = './lagom_proxy_temp.json';
-    await writeFile(configPath, JSON.stringify(config, null, 2));
-    
-    return new Promise((resolve, reject) => {
-        lagomProxyProcess = spawn('sing-box', ['run', '-c', configPath], {
-            stdio: ['ignore', 'pipe', 'pipe']
-        });
         
-        let started = false;
-        const checkStarted = (data) => {
-            const output = data.toString();
-            if (!started && (output.includes('started') || output.includes('listening'))) {
-                started = true;
-                lagomProxyAgent = new SocksProxyAgent(`socks5://127.0.0.1:${LAGOM_PROXY_PORT}`);
-                setTimeout(() => resolve(), 2000);
+        const outbound = outbounds[0];
+        
+        // Создаем конфигурацию Singbox
+        const config = {
+            log: {
+                level: "error",
+                timestamp: true
+            },
+            inbounds: [{
+                type: "socks",
+                tag: "socks-in",
+                listen: "127.0.0.1",
+                listen_port: LAGOM_PROXY_PORT,
+                sniff: false
+            }],
+            outbounds: [outbound],
+            route: {
+                rules: [{
+                    inbound: ["socks-in"],
+                    outbound: outbound.tag
+                }]
             }
         };
         
-        lagomProxyProcess.stdout.on('data', checkStarted);
-        lagomProxyProcess.stderr.on('data', checkStarted);
+        // Сохраняем конфигурацию
+        const configPath = './lagom_proxy_temp.json';
+        await writeFile(configPath, JSON.stringify(config, null, 2));
         
-        lagomProxyProcess.on('error', reject);
-        
-        // Даем время на запуск
-        setTimeout(() => {
-            if (!started) {
-                lagomProxyAgent = new SocksProxyAgent(`socks5://127.0.0.1:${LAGOM_PROXY_PORT}`);
-                resolve();
-            }
-        }, 5000);
-    });
+        return new Promise((resolve, reject) => {
+            lagomProxyProcess = spawn('sing-box', ['run', '-c', configPath], {
+                stdio: ['ignore', 'pipe', 'pipe']
+            });
+            
+            let startupTimeout = setTimeout(() => {
+                lagomProxyProcess.kill('SIGKILL');
+                reject(new Error('Lagom proxy startup timeout'));
+            }, 20000);
+            
+            let started = false;
+            const checkStarted = (data) => {
+                if (started) return;
+                
+                const output = data.toString();
+                if (output.includes('started') ||
+                    output.includes('server started') ||
+                    output.includes('tcp server started') ||
+                    output.includes('listening') ||
+                    output.includes('inbound/socks')) {
+                    started = true;
+                    clearTimeout(startupTimeout);
+                    lagomProxyAgent = new SocksProxyAgent(`socks5://127.0.0.1:${LAGOM_PROXY_PORT}`);
+                    setTimeout(() => resolve(), 3000);
+                }
+            };
+            
+            lagomProxyProcess.stdout.on('data', checkStarted);
+            lagomProxyProcess.stderr.on('data', (data) => {
+                const error = data.toString();
+                checkStarted(data);
+                
+                if (error.includes('FATAL') || error.includes('panic')) {
+                    clearTimeout(startupTimeout);
+                    lagomProxyProcess.kill('SIGKILL');
+                    reject(new Error(`Lagom proxy error: ${error}`));
+                }
+            });
+            
+            lagomProxyProcess.on('error', (err) => {
+                clearTimeout(startupTimeout);
+                reject(err);
+            });
+            
+            lagomProxyProcess.on('exit', (code, signal) => {
+                clearTimeout(startupTimeout);
+                if (code !== 0 && code !== null && !started) {
+                    reject(new Error(`Lagom proxy exited with code ${code}`));
+                }
+            });
+            
+            // Проверяем через некоторое время
+            setTimeout(() => {
+                if (!started && startupTimeout) {
+                    try {
+                        process.kill(lagomProxyProcess.pid, 0);
+                        started = true;
+                        clearTimeout(startupTimeout);
+                        lagomProxyAgent = new SocksProxyAgent(`socks5://127.0.0.1:${LAGOM_PROXY_PORT}`);
+                        setTimeout(() => resolve(), 2000);
+                    } catch (e) {
+                        // Process not running
+                    }
+                }
+            }, 3000);
+        });
+    } catch (error) {
+        console.error('Error starting lagom proxy:', error);
+        throw error;
+    }
 }
 
 // Остановка прокси для lagomvpn
 async function stopLagomProxy() {
     if (lagomProxyProcess) {
-        lagomProxyProcess.kill('SIGTERM');
-        await new Promise(resolve => setTimeout(resolve, 1000));
         try {
-            process.kill(lagomProxyProcess.pid, 0);
-            lagomProxyProcess.kill('SIGKILL');
-        } catch (e) {
-            // Process already dead
-        }
+            lagomProxyProcess.kill('SIGTERM');
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            try {
+                process.kill(lagomProxyProcess.pid, 0);
+                lagomProxyProcess.kill('SIGKILL');
+            } catch (e) {
+                // Process already dead
+            }
+        } catch (e) {}
         lagomProxyProcess = null;
         lagomProxyAgent = null;
         await exec('rm -f ./lagom_proxy_temp.json').catch(() => {});
@@ -415,7 +447,10 @@ async function fetchSubscription(url, useProxy = false) {
         const timeout = setTimeout(() => controller.abort(), 15000);
         
         const fetchOptions = {
-            signal: controller.signal
+            signal: controller.signal,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
         };
         
         // Используем прокси агент если требуется
