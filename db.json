@@ -2268,7 +2268,7 @@
     "address": "vpn-14.tgvpnbot.com",
     "name": "383631333-2-happynewyearbabaduk",
     "link": "vless://94ad3f54-c3ac-11ef-9af8-0242ac120003@vpn-14.tgvpnbot.com:443?flow=xtls-rprx-vision&fp=chrome&pbk=XTSLsJkz4YjQiCdxr2WxZy5MIqMYxKXQp2-IDv9w2C8&security=reality&sid=0a545c1781dcec&sni=dev.memfis.me&type=tcp",
-    "full_link": "vless://94ad3f54-c3ac-11ef-9af8-0242ac120003@vpn-14.tgvpnbot.com:443?flow=xtls-rprx-vision&fp=chrome&pbk=XTSLsJkz4YjQiCdxr2WxZy5MIqMYxKXQp2-IDv9w2C8&security=reality&sid=0a545c1781dcec&sni=dev.memfis.me&spx=%2FuKMQGfBwwYdO7bW&type=tcp#383631333-2-happynewyearbabaduk",
+    "full_link": "vless://94ad3f54-c3ac-11ef-9af8-0242ac120003@vpn-14.tgvpnbot.com:443?flow=xtls-rprx-vision&fp=chrome&pbk=XTSLsJkz4YjQiCdxr2WxZy5MIqMYxKXQp2-IDv9w2C8&security=reality&sid=0a545c1781dcec&sni=dev.memfis.me&spx=%2FXI9noe3n2IC991r&type=tcp#383631333-2-happynewyearbabaduk",
     "flag": "🌐",
     "country": "Unknown",
     "isPro": true
@@ -2333,7 +2333,7 @@
     "level": "high",
     "userId": "77583f481f3abdf01d2f9a9d63334eca",
     "username": "f3f0bfd2bd43420eb7716e7f06c03c0e",
-    "trafficUsed": "51.13 GiB",
+    "trafficUsed": "51.16 GiB",
     "trafficLimit": "0",
     "address": "pro-se.emrata.top",
     "name": "🇸🇪 Швеция ⚡",
@@ -2345,7 +2345,7 @@
     "purpose": "WARP",
     "isPro": true,
     "trafficInfo": {
-      "used": "51.13 GiB",
+      "used": "51.16 GiB",
       "limit": "0",
       "username": "f3f0bfd2bd43420eb7716e7f06c03c0e"
     }
@@ -2410,7 +2410,7 @@
     "level": "high",
     "userId": "77583f481f3abdf01d2f9a9d63334eca",
     "username": "f3f0bfd2bd43420eb7716e7f06c03c0e",
-    "trafficUsed": "51.13 GiB",
+    "trafficUsed": "51.16 GiB",
     "trafficLimit": "0",
     "address": "pro-ru-de.emrata.top",
     "name": "🇩🇪 Германия",
@@ -2422,7 +2422,7 @@
     "purpose": null,
     "isPro": true,
     "trafficInfo": {
-      "used": "51.13 GiB",
+      "used": "51.16 GiB",
       "limit": "0",
       "username": "f3f0bfd2bd43420eb7716e7f06c03c0e"
     }
@@ -2487,7 +2487,7 @@
     "level": "high",
     "userId": "77583f481f3abdf01d2f9a9d63334eca",
     "username": "f3f0bfd2bd43420eb7716e7f06c03c0e",
-    "trafficUsed": "51.13 GiB",
+    "trafficUsed": "51.16 GiB",
     "trafficLimit": "0",
     "address": "pro-uk.emrata.top",
     "name": "🇬🇧 Великобритания ",
@@ -2499,7 +2499,7 @@
     "purpose": null,
     "isPro": true,
     "trafficInfo": {
-      "used": "51.13 GiB",
+      "used": "51.16 GiB",
       "limit": "0",
       "username": "f3f0bfd2bd43420eb7716e7f06c03c0e"
     }
@@ -2564,7 +2564,7 @@
     "level": "high",
     "userId": "77583f481f3abdf01d2f9a9d63334eca",
     "username": "f3f0bfd2bd43420eb7716e7f06c03c0e",
-    "trafficUsed": "51.13 GiB",
+    "trafficUsed": "51.16 GiB",
     "trafficLimit": "0",
     "address": "pro-lv.emrata.top",
     "name": "🇱🇻 Латвия",
@@ -2576,7 +2576,7 @@
     "purpose": null,
     "isPro": true,
     "trafficInfo": {
-      "used": "51.13 GiB",
+      "used": "51.16 GiB",
       "limit": "0",
       "username": "f3f0bfd2bd43420eb7716e7f06c03c0e"
     }
@@ -2641,7 +2641,7 @@
     "level": "high",
     "userId": "77583f481f3abdf01d2f9a9d63334eca",
     "username": "f3f0bfd2bd43420eb7716e7f06c03c0e",
-    "trafficUsed": "51.13 GiB",
+    "trafficUsed": "51.16 GiB",
     "trafficLimit": "0",
     "address": "pro-sg.emrata.top",
     "name": "🇸🇬 Сингапур",
@@ -2653,7 +2653,7 @@
     "purpose": null,
     "isPro": true,
     "trafficInfo": {
-      "used": "51.13 GiB",
+      "used": "51.16 GiB",
       "limit": "0",
       "username": "f3f0bfd2bd43420eb7716e7f06c03c0e"
     }
@@ -2718,7 +2718,7 @@
     "level": "high",
     "userId": "77583f481f3abdf01d2f9a9d63334eca",
     "username": "f3f0bfd2bd43420eb7716e7f06c03c0e",
-    "trafficUsed": "51.13 GiB",
+    "trafficUsed": "51.16 GiB",
     "trafficLimit": "0",
     "address": "pro-au.emrata.top",
     "name": "🇦🇺 Австралия",
@@ -2730,7 +2730,7 @@
     "purpose": null,
     "isPro": true,
     "trafficInfo": {
-      "used": "51.13 GiB",
+      "used": "51.16 GiB",
       "limit": "0",
       "username": "f3f0bfd2bd43420eb7716e7f06c03c0e"
     }
@@ -2795,7 +2795,7 @@
     "level": "high",
     "userId": "77583f481f3abdf01d2f9a9d63334eca",
     "username": "f3f0bfd2bd43420eb7716e7f06c03c0e",
-    "trafficUsed": "51.13 GiB",
+    "trafficUsed": "51.16 GiB",
     "trafficLimit": "0",
     "address": "pro-pl.emrata.top",
     "name": "🇵🇱 Польша",
@@ -2807,7 +2807,7 @@
     "purpose": null,
     "isPro": true,
     "trafficInfo": {
-      "used": "51.13 GiB",
+      "used": "51.16 GiB",
       "limit": "0",
       "username": "f3f0bfd2bd43420eb7716e7f06c03c0e"
     }
@@ -2872,7 +2872,7 @@
     "level": "high",
     "userId": "77583f481f3abdf01d2f9a9d63334eca",
     "username": "f3f0bfd2bd43420eb7716e7f06c03c0e",
-    "trafficUsed": "51.13 GiB",
+    "trafficUsed": "51.16 GiB",
     "trafficLimit": "0",
     "address": "pro-br.emrata.top",
     "name": "🇧🇷 Бразилия",
@@ -2884,7 +2884,7 @@
     "purpose": null,
     "isPro": true,
     "trafficInfo": {
-      "used": "51.13 GiB",
+      "used": "51.16 GiB",
       "limit": "0",
       "username": "f3f0bfd2bd43420eb7716e7f06c03c0e"
     }
@@ -2949,7 +2949,7 @@
     "level": "high",
     "userId": "77583f481f3abdf01d2f9a9d63334eca",
     "username": "f3f0bfd2bd43420eb7716e7f06c03c0e",
-    "trafficUsed": "51.13 GiB",
+    "trafficUsed": "51.16 GiB",
     "trafficLimit": "0",
     "address": "pro-es.emrata.top",
     "name": "🇪🇸 Испания",
@@ -2961,7 +2961,7 @@
     "purpose": null,
     "isPro": true,
     "trafficInfo": {
-      "used": "51.13 GiB",
+      "used": "51.16 GiB",
       "limit": "0",
       "username": "f3f0bfd2bd43420eb7716e7f06c03c0e"
     }
@@ -3026,7 +3026,7 @@
     "level": "high",
     "userId": "77583f481f3abdf01d2f9a9d63334eca",
     "username": "f3f0bfd2bd43420eb7716e7f06c03c0e",
-    "trafficUsed": "51.13 GiB",
+    "trafficUsed": "51.16 GiB",
     "trafficLimit": "0",
     "address": "pro-kz.emrata.top",
     "name": "🇰🇿 Казахстан",
@@ -3038,7 +3038,7 @@
     "purpose": null,
     "isPro": true,
     "trafficInfo": {
-      "used": "51.13 GiB",
+      "used": "51.16 GiB",
       "limit": "0",
       "username": "f3f0bfd2bd43420eb7716e7f06c03c0e"
     }
@@ -3103,7 +3103,7 @@
     "level": "high",
     "userId": "77583f481f3abdf01d2f9a9d63334eca",
     "username": "f3f0bfd2bd43420eb7716e7f06c03c0e",
-    "trafficUsed": "51.13 GiB",
+    "trafficUsed": "51.16 GiB",
     "trafficLimit": "0",
     "address": "pro-ru.emrata.top",
     "name": "🇷🇺 Россия",
@@ -3115,7 +3115,7 @@
     "purpose": null,
     "isPro": true,
     "trafficInfo": {
-      "used": "51.13 GiB",
+      "used": "51.16 GiB",
       "limit": "0",
       "username": "f3f0bfd2bd43420eb7716e7f06c03c0e"
     }
@@ -3180,7 +3180,7 @@
     "level": "high",
     "userId": "77583f481f3abdf01d2f9a9d63334eca",
     "username": "f3f0bfd2bd43420eb7716e7f06c03c0e",
-    "trafficUsed": "51.13 GiB",
+    "trafficUsed": "51.16 GiB",
     "trafficLimit": "0",
     "address": "pro-usa.emrata.top",
     "name": "🇺🇸 США",
@@ -3192,7 +3192,7 @@
     "purpose": null,
     "isPro": true,
     "trafficInfo": {
-      "used": "51.13 GiB",
+      "used": "51.16 GiB",
       "limit": "0",
       "username": "f3f0bfd2bd43420eb7716e7f06c03c0e"
     }
@@ -3257,7 +3257,7 @@
     "level": "high",
     "userId": "77583f481f3abdf01d2f9a9d63334eca",
     "username": "f3f0bfd2bd43420eb7716e7f06c03c0e",
-    "trafficUsed": "51.13 GiB",
+    "trafficUsed": "51.16 GiB",
     "trafficLimit": "0",
     "address": "pro-tr.emrata.top",
     "name": "🇹🇷 Турция",
@@ -3269,7 +3269,7 @@
     "purpose": null,
     "isPro": true,
     "trafficInfo": {
-      "used": "51.13 GiB",
+      "used": "51.16 GiB",
       "limit": "0",
       "username": "f3f0bfd2bd43420eb7716e7f06c03c0e"
     }
@@ -3334,7 +3334,7 @@
     "level": "high",
     "userId": "77583f481f3abdf01d2f9a9d63334eca",
     "username": "f3f0bfd2bd43420eb7716e7f06c03c0e",
-    "trafficUsed": "51.13 GiB",
+    "trafficUsed": "51.16 GiB",
     "trafficLimit": "0",
     "address": "pro-fr.emrata.top",
     "name": "🇫🇷 Франция",
@@ -3346,7 +3346,7 @@
     "purpose": null,
     "isPro": true,
     "trafficInfo": {
-      "used": "51.13 GiB",
+      "used": "51.16 GiB",
       "limit": "0",
       "username": "f3f0bfd2bd43420eb7716e7f06c03c0e"
     }
@@ -3411,7 +3411,7 @@
     "level": "high",
     "userId": "77583f481f3abdf01d2f9a9d63334eca",
     "username": "f3f0bfd2bd43420eb7716e7f06c03c0e",
-    "trafficUsed": "51.13 GiB",
+    "trafficUsed": "51.16 GiB",
     "trafficLimit": "0",
     "address": "pro-za.emrata.top",
     "name": "🇿🇦 Южная Африка",
@@ -3423,7 +3423,7 @@
     "purpose": null,
     "isPro": true,
     "trafficInfo": {
-      "used": "51.13 GiB",
+      "used": "51.16 GiB",
       "limit": "0",
       "username": "f3f0bfd2bd43420eb7716e7f06c03c0e"
     }
@@ -3488,7 +3488,7 @@
     "level": "high",
     "userId": "77583f481f3abdf01d2f9a9d63334eca",
     "username": "f3f0bfd2bd43420eb7716e7f06c03c0e",
-    "trafficUsed": "51.13 GiB",
+    "trafficUsed": "51.16 GiB",
     "trafficLimit": "0",
     "address": "pro-jp.emrata.top",
     "name": "🇯🇵 Япония",
@@ -3500,7 +3500,7 @@
     "purpose": null,
     "isPro": true,
     "trafficInfo": {
-      "used": "51.13 GiB",
+      "used": "51.16 GiB",
       "limit": "0",
       "username": "f3f0bfd2bd43420eb7716e7f06c03c0e"
     }
@@ -3565,7 +3565,7 @@
     "level": "high",
     "userId": "77583f481f3abdf01d2f9a9d63334eca",
     "username": "f3f0bfd2bd43420eb7716e7f06c03c0e",
-    "trafficUsed": "51.13 GiB",
+    "trafficUsed": "51.16 GiB",
     "trafficLimit": "0",
     "address": "pro-usa-yt.emrata.top",
     "name": "🌐 YouTube (глобальный)",
@@ -3577,7 +3577,7 @@
     "purpose": "YouTube",
     "isPro": true,
     "trafficInfo": {
-      "used": "51.13 GiB",
+      "used": "51.16 GiB",
       "limit": "0",
       "username": "f3f0bfd2bd43420eb7716e7f06c03c0e"
     }
@@ -3642,7 +3642,7 @@
     "level": "high",
     "userId": "1081c6fdf376311ee976deae66dbec27",
     "username": "user_115132",
-    "trafficUsed": "0",
+    "trafficUsed": "32.23 KiB",
     "trafficLimit": "40.00 GiB",
     "address": "free-de.kanye-west.top",
     "name": "🇩🇪 Германия ",
@@ -3654,7 +3654,7 @@
     "purpose": null,
     "isPro": false,
     "trafficInfo": {
-      "used": "0",
+      "used": "32.23 KiB",
       "limit": "40.00 GiB",
       "username": "user_115132"
     }
@@ -3719,7 +3719,7 @@
     "level": "high",
     "userId": "1081c6fdf376311ee976deae66dbec27",
     "username": "user_115132",
-    "trafficUsed": "0",
+    "trafficUsed": "32.23 KiB",
     "trafficLimit": "40.00 GiB",
     "address": "free-ru-de.kanye-west.top",
     "name": "🇩🇪 Германия Резерв",
@@ -3731,7 +3731,7 @@
     "purpose": "Резерв",
     "isPro": false,
     "trafficInfo": {
-      "used": "0",
+      "used": "32.23 KiB",
       "limit": "40.00 GiB",
       "username": "user_115132"
     }
