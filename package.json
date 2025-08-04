@@ -1,10 +1,10 @@
 {
-  "name": "proxy-tester",
+  "name": "opexvpn",
   "version": "1.0.0",
   "private": true,
   "type": "module",
   "dependencies": {
-    "singbox-converter": "^1.0.4",
+    "singbox-converter": "^1.0.8",
     "node-fetch": "^3.3.2"
   }
 }
