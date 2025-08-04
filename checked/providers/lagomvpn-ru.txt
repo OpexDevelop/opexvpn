@@ -1,0 +1,1 @@
+vless://c58a99da-6793-3819-70dc-ca69a5699be2@pro-ru.emrata.top:443?security=reality&type=tcp&headerType=&path=&host=&flow=xtls-rprx-vision&sni=pro-ru.emrata.top&fp=chrome&pbk=m5xJ6vp7KWsgfynITMY3a5uGsrkDb76S7WiAlw2owg4&sid=#%F0%9F%87%B7%F0%9F%87%BA%D0%A0%D0%BE%D1%81%D1%81%D0%B8%D1%8F%231%20%C2%B7%2050.66%2F0%20lagomvpn-pro
