@@ -2272,5 +2272,71 @@
     "flag": "🌐",
     "country": "Unknown",
     "isPro": true
+  },
+  {
+    "status": "working",
+    "created_at": "2025-08-04T22:54:13.738Z",
+    "checks": [
+      {
+        "timestamp": "2025-08-04T22:54:24.376Z",
+        "ip_address": "2a0c:16c0:515:240::b493",
+        "ping_ms": "506",
+        "insecure": false,
+        "country": "LV",
+        "asn": "AS42532",
+        "org_name": "SIA VEESP",
+        "city": "Riga",
+        "ip_info_response": {
+          "ip": "2a0c:16c0:515:240::b493",
+          "providers": {
+            "dbip": {
+              "country": "LV",
+              "asn": "AS42532",
+              "org_name": "SIA VEESP",
+              "city": "Riga",
+              "zip_code": "",
+              "time_zone": "",
+              "meta": "<a href='https://db-ip.com'>IP Geolocation by DB-IP</a>"
+            },
+            "ip2location": {
+              "country": "LV",
+              "asn": "",
+              "org_name": "",
+              "city": "Riga",
+              "zip_code": "1050",
+              "time_zone": "+03:00",
+              "meta": "This site or product includes IP2Location LITE data available from <a href=\"https://lite.ip2location.com\">https://lite.ip2location.com</a>."
+            },
+            "ipinfo": {
+              "country": "LV",
+              "asn": "AS42532",
+              "org_name": "SIA VEESP",
+              "city": "",
+              "zip_code": "",
+              "time_zone": "",
+              "meta": "<p>IP address data powered by <a href=\"https://ipinfo.io\" >IPinfo</a></p>"
+            },
+            "maxmind": {
+              "country": "LV",
+              "asn": "AS42532",
+              "org_name": "SIA VEESP",
+              "city": "Riga",
+              "zip_code": "",
+              "time_zone": "+03:00",
+              "meta": "This product includes GeoLite2 Data created by MaxMind, available from https://www.maxmind.com."
+            }
+          }
+        }
+      }
+    ],
+    "provider": "tgvpnbot",
+    "level": "high",
+    "address": "vpn-14.tgvpnbot.com",
+    "name": "383631333-2-happynewyearbabaduk",
+    "link": "vless://94ad3f54-c3ac-11ef-9af8-0242ac120003@vpn-14.tgvpnbot.com:443?flow=xtls-rprx-vision&fp=chrome&pbk=XTSLsJkz4YjQiCdxr2WxZy5MIqMYxKXQp2-IDv9w2C8&security=reality&sid=0a545c1781dcec&sni=dev.memfis.me&spx=%2FyBLHBJ0Yh49hpmG&type=tcp",
+    "full_link": "vless://94ad3f54-c3ac-11ef-9af8-0242ac120003@vpn-14.tgvpnbot.com:443?flow=xtls-rprx-vision&fp=chrome&pbk=XTSLsJkz4YjQiCdxr2WxZy5MIqMYxKXQp2-IDv9w2C8&security=reality&sid=0a545c1781dcec&sni=dev.memfis.me&spx=%2FyBLHBJ0Yh49hpmG&type=tcp#383631333-2-happynewyearbabaduk",
+    "flag": "🌐",
+    "country": "Unknown",
+    "isPro": true
   }
 ]
