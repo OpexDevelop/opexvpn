@@ -21,6 +21,20 @@ const LAGOM_PROXY_PORT = 30000;
 let lagomProxyProcess = null;
 let lagomProxyAgent = null;
 
+// Функция для нормализации ссылки (убираем изменяющиеся параметры)
+function normalizeLink(link) {
+    try {
+        const url = new URL(link);
+        // Удаляем параметр spx для tgvpnbot, так как он меняется
+        if (url.hostname.includes('tgvpnbot.com')) {
+            url.searchParams.delete('spx');
+        }
+        return url.toString().split('#')[0];
+    } catch (e) {
+        return link.split('#')[0];
+    }
+}
+
 // Запуск прокси для lagomvpn через Singbox
 async function startLagomProxy() {
     if (lagomProxyProcess) return;
@@ -253,7 +267,7 @@ async function parseAbvpnSubscription(url, content) {
             try {
                 const linkUrl = new URL(line);
                 const fullLink = line;
-                const link = line.split('#')[0];
+                const link = normalizeLink(line);
                 const name = decodeURIComponent(linkUrl.hash.substring(1));
                 const parsedName = parseAbvpnServerName(name);
                 
@@ -303,7 +317,7 @@ async function parseLagomSubscription(url, content) {
             for (const link of response.links) {
                 const linkUrl = new URL(link);
                 const fullLink = link;
-                const baseLink = link.split('#')[0];
+                const baseLink = normalizeLink(link);
                 const name = decodeURIComponent(linkUrl.hash.substring(1));
                 
                 const parsedInfo = parseLagomServerName(name, linkUrl.hostname);
@@ -333,7 +347,7 @@ async function parseLagomSubscription(url, content) {
             for (const line of lines) {
                 const linkUrl = new URL(line);
                 const fullLink = line;
-                const baseLink = line.split('#')[0];
+                const baseLink = normalizeLink(line);
                 const name = decodeURIComponent(linkUrl.hash.substring(1));
                 
                 const parsedInfo = parseLagomServerName(name, linkUrl.hostname);
@@ -417,7 +431,7 @@ async function parseTgvpnbotSubscription(url, content) {
         for (const line of lines) {
             const linkUrl = new URL(line);
             const fullLink = line;
-            const baseLink = line.split('#')[0];
+            const baseLink = normalizeLink(line);
             const name = linkUrl.hash ? decodeURIComponent(linkUrl.hash.substring(1)) : 'TgVpnBot Server';
             
             servers.push({
@@ -540,7 +554,7 @@ export async function collectLinks(sourceUrl, level = 'high') {
                         // Если парсер не найден, добавляем как обычные ссылки
                         const lines = content.trim().split('\n').filter(line => line.includes('://'));
                         for (const line of lines) {
-                            const link = line.split('#')[0];
+                            const link = normalizeLink(line);
                             const name = line.includes('#') ? 
                                 decodeURIComponent(line.split('#')[1]) : 'Unknown';
                             
@@ -555,7 +569,7 @@ export async function collectLinks(sourceUrl, level = 'high') {
                     }
                 } else if (source.includes('://')) {
                     // Обычная прокси ссылка
-                    const link = source.split('#')[0];
+                    const link = normalizeLink(source);
                     const name = source.includes('#') ? 
                         decodeURIComponent(source.split('#')[1]) : 'Unknown';
                     
@@ -577,47 +591,52 @@ export async function collectLinks(sourceUrl, level = 'high') {
             await stopLagomProxy();
         }
         
-        // Для lagomvpn проверяем лимиты трафика и выбираем только один аккаунт
-        const lagomServers = allServers.filter(s => s.provider === 'lagomvpn' && s.trafficInfo);
-        if (lagomServers.length > 0) {
-            // Группируем по аккаунтам
-            const lagomAccounts = {};
-            lagomServers.forEach(server => {
-                const username = server.username || 'unknown';
-                if (!lagomAccounts[username]) {
-                    lagomAccounts[username] = {
-                        servers: [],
-                        trafficInfo: server.trafficInfo
-                    };
-                }
-                lagomAccounts[username].servers.push(server);
-            });
-            
-            // Выбираем аккаунт с доступным трафиком
-            let selectedAccount = null;
-            for (const [username, account] of Object.entries(lagomAccounts)) {
-                const usedGB = parseFloat(account.trafficInfo.used.replace(/[^0-9.]/g, '')) || 0;
-                const limitGB = parseFloat(account.trafficInfo.limit.replace(/[^0-9.]/g, '')) || 0;
-                
-                if (limitGB === 0 || usedGB < limitGB) {
-                    selectedAccount = account;
-                    break;
-                }
+        // Для lagomvpn обрабатываем по новой логике:
+        // 1. Все pro серверы остаются
+        // 2. Из free серверов выбираем только из одного аккаунта с доступным трафиком
+        const lagomProServers = allServers.filter(s => s.provider === 'lagomvpn' && s.isPro);
+        const lagomFreeServers = allServers.filter(s => s.provider === 'lagomvpn' && !s.isPro && s.trafficInfo);
+        const nonLagomServers = allServers.filter(s => s.provider !== 'lagomvpn');
+        
+        console.log(`Found ${lagomProServers.length} Lagom PRO servers`);
+        console.log(`Found ${lagomFreeServers.length} Lagom FREE servers`);
+        
+        // Группируем free серверы по аккаунтам
+        const lagomFreeAccounts = {};
+        lagomFreeServers.forEach(server => {
+            const username = server.username || 'unknown';
+            if (!lagomFreeAccounts[username]) {
+                lagomFreeAccounts[username] = {
+                    servers: [],
+                    trafficInfo: server.trafficInfo
+                };
             }
+            lagomFreeAccounts[username].servers.push(server);
+        });
+        
+        // Выбираем один free аккаунт с доступным трафиком
+        let selectedFreeServers = [];
+        for (const [username, account] of Object.entries(lagomFreeAccounts)) {
+            const usedGB = parseFloat(account.trafficInfo.used.replace(/[^0-9.]/g, '')) || 0;
+            const limitGB = parseFloat(account.trafficInfo.limit.replace(/[^0-9.]/g, '')) || 0;
             
-            // Удаляем все lagom серверы и добавляем только выбранные
-            const nonLagomServers = allServers.filter(s => s.provider !== 'lagomvpn' || !s.trafficInfo);
-            if (selectedAccount) {
-                return [...nonLagomServers, ...selectedAccount.servers];
-            } else {
-                console.log('All lagom accounts have exhausted traffic');
-                return nonLagomServers;
+            if (limitGB === 0 || usedGB < limitGB) {
+                selectedFreeServers = account.servers;
+                console.log(`Selected Lagom FREE account: ${username} (${account.trafficInfo.used}/${account.trafficInfo.limit})`);
+                break;
             }
         }
         
-        // Merge дубликатов по адресу
+        if (selectedFreeServers.length === 0) {
+            console.log('All Lagom FREE accounts have exhausted traffic');
+        }
+        
+        // Объединяем все серверы
+        const finalServers = [...nonLagomServers, ...lagomProServers, ...selectedFreeServers];
+        
+        // Merge дубликатов по нормализованному link
         const mergedServers = new Map();
-        for (const server of allServers) {
+        for (const server of finalServers) {
             const key = server.link;
             const existing = mergedServers.get(key);
             
