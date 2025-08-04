@@ -91,7 +91,8 @@ export async function runProxyTests() {
         const promises = chunk.map(async (proxyEntry, chunkIndex) => {
             const globalIndex = i + chunkIndex;
             const port = BASE_PORT + globalIndex;
-            const result = await testProxy(proxyEntry.full_link, globalIndex, port);
+            // Передаем провайдера для правильной настройки WARP
+            const result = await testProxy(proxyEntry.full_link, globalIndex, port, proxyEntry.provider);
             
             const checkResult = {
                 timestamp: new Date().toISOString()
