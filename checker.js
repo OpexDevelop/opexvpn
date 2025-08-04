@@ -379,4 +379,4 @@ async function testProxy(link, index, port) {
     };
 }
 
-export { shouldCheckProxy, getLastRecordedIpInfo, extractGeoData, testProxy, CONCURRENCY_LIMIT, BASE_PORT };
+export { shouldCheckProxy, getLastRecordedIpInfo, extractGeoData, testProxy, CONCURRENCY_LIMIT, BASE_PORT }; 
