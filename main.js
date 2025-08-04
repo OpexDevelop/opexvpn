@@ -65,7 +65,22 @@ export async function runProxyTests() {
     }
     
     // Фильтруем прокси для проверки
-    const proxiesToCheck = database.filter(shouldCheckProxy);
+    const proxiesToCheck = database.filter(proxy => {
+        // Для lagomvpn проверяем лимиты трафика
+        if (proxy.provider === 'lagomvpn' && proxy.trafficUsed && proxy.trafficLimit) {
+            const usedGB = parseFloat(proxy.trafficUsed.replace(/[^0-9.]/g, '')) || 0;
+            const limitGB = parseFloat(proxy.trafficLimit.replace(/[^0-9.]/g, '')) || 0;
+            
+            if (limitGB > 0 && usedGB >= limitGB) {
+                // Помечаем как traffic_exhausted вместо error
+                proxy.status = 'traffic_exhausted';
+                return false;
+            }
+        }
+        
+        return shouldCheckProxy(proxy);
+    });
+    
     console.log(`${proxiesToCheck.length} proxies need checking`);
     
     // Тестируем прокси
@@ -124,10 +139,12 @@ export async function runProxyTests() {
     const working = database.filter(p => p.status === 'working').length;
     const errors = database.filter(p => p.status === 'error').length;
     const pending = database.filter(p => p.status === 'pending').length;
+    const trafficExhausted = database.filter(p => p.status === 'traffic_exhausted').length;
     
     console.log('\nSummary:');
     console.log(`  Total: ${database.length}`);
     console.log(`  Working: ${working}`);
     console.log(`  Errors: ${errors}`);
     console.log(`  Pending: ${pending}`);
+    console.log(`  Traffic Exhausted: ${trafficExhausted}`);
 }
