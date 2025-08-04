@@ -5,7 +5,6 @@ import { spawn } from 'child_process';
 import { writeFile } from 'fs/promises';
 import { exec as execCallback } from 'child_process';
 import { promisify } from 'util';
-import { HttpsProxyAgent } from 'https-proxy-agent';
 import { SocksProxyAgent } from 'socks-proxy-agent';
 
 const exec = promisify(execCallback);
@@ -14,56 +13,69 @@ const httpsAgent = new https.Agent({
     rejectUnauthorized: false
 });
 
-// WARP конфигурация для Singbox
-const WARP_CONFIG = {
-    log: {
-        level: "error"
-    },
-    inbounds: [{
-        type: "socks",
-        tag: "socks-in",
-        listen: "127.0.0.1",
-        listen_port: 30000,
-        sniff: false
-    }],
-    outbounds: [{
-        "local_address": [
-            "172.16.0.2/32",
-            "2606:4700:110:8ee5:7fdc:c702:9d12:ac0b/128"
-        ],
-        "mtu": 1280,
-        "peer_public_key": "bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=",
-        "pre_shared_key": "",
-        "private_key": "aKYezQKQhne0c4Dp+72PDSQWF+TOJXy2Y1+yqUCN5HU=",
-        "reserved": "QTEG",
-        "server": "188.114.97.97",
-        "server_port": 500,
-        "type": "wireguard",
-        "tag": "warp"
-    }],
-    route: {
-        rules: [{
-            inbound: ["socks-in"],
-            outbound: "warp"
-        }]
-    }
-};
+// Прокси для обхода блокировки lagomvpn
+const LAGOM_PROXY_LINK = 'vless://4f297b1c-4c2b-4b23-b724-7c4379f3018a@217.16.16.225:443?security=reality&type=tcp&fp=firefox&sni=www.vk.com&pbk=PL5TmzBOF8lJDXUp1oDM2lHMNk96fmjzmdoq0r9oFR8&sid=719b678d&spx=/';
+const LAGOM_PROXY_PORT = 30000;
 
-let warpProcess = null;
-let warpAgent = null;
+let lagomProxyProcess = null;
+let lagomProxyAgent = null;
 
-// Запуск WARP через Singbox
-async function startWarp() {
-    if (warpProcess) return;
+// Запуск прокси для lagomvpn через Singbox
+async function startLagomProxy() {
+    if (lagomProxyProcess) return;
     
-    console.log('Starting WARP proxy for lagomvpn...');
+    console.log('Starting proxy for lagomvpn subscriptions...');
+    
+    // Конфигурация Singbox с vless прокси
+    const config = {
+        log: {
+            level: "error"
+        },
+        inbounds: [{
+            type: "socks",
+            tag: "socks-in",
+            listen: "127.0.0.1",
+            listen_port: LAGOM_PROXY_PORT,
+            sniff: false
+        }],
+        outbounds: [{
+            type: "vless",
+            tag: "proxy",
+            server: "217.16.16.225",
+            server_port: 443,
+            uuid: "4f297b1c-4c2b-4b23-b724-7c4379f3018a",
+            flow: "xtls-rprx-vision",
+            tls: {
+                enabled: true,
+                server_name: "www.vk.com",
+                reality: {
+                    enabled: true,
+                    public_key: "PL5TmzBOF8lJDXUp1oDM2lHMNk96fmjzmdoq0r9oFR8",
+                    short_id: "719b678d"
+                },
+                utls: {
+                    enabled: true,
+                    fingerprint: "firefox"
+                }
+            },
+            transport: {
+                type: "tcp"
+            }
+        }],
+        route: {
+            rules: [{
+                inbound: ["socks-in"],
+                outbound: "proxy"
+            }]
+        }
+    };
     
     // Сохраняем конфигурацию
-    const configPath = './warp_config_temp.json';
-    await writeFile(configPath, JSON.stringify(WARP_CONFIG, null, 2));
+    const configPath = './lagom_proxy_temp.json';
+    await writeFile(configPath, JSON.stringify(config, null, 2));
     
     return new Promise((resolve, reject) => {
-        warpProcess = spawn('sing-box', ['run', '-c', configPath], {
+        lagomProxyProcess = spawn('sing-box', ['run', '-c', configPath], {
             stdio: ['ignore', 'pipe', 'pipe']
         });
         
@@ -72,40 +84,40 @@ async function startWarp() {
             const output = data.toString();
             if (!started && (output.includes('started') || output.includes('listening'))) {
                 started = true;
-                warpAgent = new SocksProxyAgent('socks5://127.0.0.1:30000');
+                lagomProxyAgent = new SocksProxyAgent(`socks5://127.0.0.1:${LAGOM_PROXY_PORT}`);
                 setTimeout(() => resolve(), 2000);
             }
         };
         
-        warpProcess.stdout.on('data', checkStarted);
-        warpProcess.stderr.on('data', checkStarted);
+        lagomProxyProcess.stdout.on('data', checkStarted);
+        lagomProxyProcess.stderr.on('data', checkStarted);
         
-        warpProcess.on('error', reject);
+        lagomProxyProcess.on('error', reject);
         
         // Даем время на запуск
         setTimeout(() => {
             if (!started) {
-                warpAgent = new SocksProxyAgent('socks5://127.0.0.1:30000');
+                lagomProxyAgent = new SocksProxyAgent(`socks5://127.0.0.1:${LAGOM_PROXY_PORT}`);
                 resolve();
             }
         }, 5000);
     });
 }
 
-// Остановка WARP
-async function stopWarp() {
-    if (warpProcess) {
-        warpProcess.kill('SIGTERM');
+// Остановка прокси для lagomvpn
+async function stopLagomProxy() {
+    if (lagomProxyProcess) {
+        lagomProxyProcess.kill('SIGTERM');
         await new Promise(resolve => setTimeout(resolve, 1000));
         try {
-            process.kill(warpProcess.pid, 0);
-            warpProcess.kill('SIGKILL');
+            process.kill(lagomProxyProcess.pid, 0);
+            lagomProxyProcess.kill('SIGKILL');
         } catch (e) {
             // Process already dead
         }
-        warpProcess = null;
-        warpAgent = null;
-        await exec('rm -f ./warp_config_temp.json').catch(() => {});
+        lagomProxyProcess = null;
+        lagomProxyAgent = null;
+        await exec('rm -f ./lagom_proxy_temp.json').catch(() => {});
     }
 }
 
@@ -118,7 +130,7 @@ const PARSERS = {
     lagomvpn: {
         detect: (url) => url.includes('williamsbakery.life'),
         parse: parseLagomSubscription,
-        requiresWarp: true
+        requiresProxy: true
     },
     tgvpnbot: {
         detect: (url) => url.includes('tgvpnbot.com'),
@@ -397,7 +409,7 @@ async function parseTgvpnbotSubscription(url, content) {
     }
 }
 
-async function fetchSubscription(url, useWarp = false) {
+async function fetchSubscription(url, useProxy = false) {
     try {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 15000);
@@ -406,10 +418,10 @@ async function fetchSubscription(url, useWarp = false) {
             signal: controller.signal
         };
         
-        // Используем WARP агент если требуется
-        if (useWarp && warpAgent) {
-            fetchOptions.agent = warpAgent;
-        } else if (!useWarp) {
+        // Используем прокси агент если требуется
+        if (useProxy && lagomProxyAgent) {
+            fetchOptions.agent = lagomProxyAgent;
+        } else if (!useProxy) {
             fetchOptions.agent = url.startsWith('https') ? httpsAgent : undefined;
         }
         
@@ -450,19 +462,19 @@ export async function collectLinks(sourceUrl, level = 'high') {
             .split('\n')
             .filter(line => line.trim());
         
-        // Проверяем, нужен ли WARP для каких-либо источников
-        const needsWarp = sources.some(source => {
+        // Проверяем, нужен ли прокси для каких-либо источников
+        const needsProxy = sources.some(source => {
             for (const [name, config] of Object.entries(PARSERS)) {
-                if (config.detect(source) && config.requiresWarp) {
+                if (config.detect(source) && config.requiresProxy) {
                     return true;
                 }
             }
             return false;
         });
         
-        // Запускаем WARP если нужно
-        if (needsWarp) {
-            await startWarp();
+        // Запускаем прокси если нужно
+        if (needsProxy) {
+            await startLagomProxy();
         }
         
         const allServers = [];
@@ -472,18 +484,18 @@ export async function collectLinks(sourceUrl, level = 'high') {
                 if (source.startsWith('http://') || source.startsWith('https://')) {
                     // Определяем парсер
                     let parser = null;
-                    let requiresWarp = false;
+                    let requiresProxy = false;
                     
                     for (const [name, config] of Object.entries(PARSERS)) {
                         if (config.detect(source)) {
                             parser = config;
-                            requiresWarp = config.requiresWarp || false;
+                            requiresProxy = config.requiresProxy || false;
                             break;
                         }
                     }
                     
                     // Это подписка
-                    const content = await fetchSubscription(source, requiresWarp);
+                    const content = await fetchSubscription(source, requiresProxy);
                     
                     if (parser) {
                         const servers = await parser.parse(source, content);
@@ -525,9 +537,9 @@ export async function collectLinks(sourceUrl, level = 'high') {
             }
         }
         
-        // Останавливаем WARP
-        if (needsWarp) {
-            await stopWarp();
+        // Останавливаем прокси
+        if (needsProxy) {
+            await stopLagomProxy();
         }
         
         // Для lagomvpn проверяем лимиты трафика и выбираем только один аккаунт
@@ -585,7 +597,7 @@ export async function collectLinks(sourceUrl, level = 'high') {
         console.error('Error collecting links:', error);
         return [];
     } finally {
-        // Гарантируем остановку WARP в любом случае
-        await stopWarp();
+        // Гарантируем остановку прокси в любом случае
+        await stopLagomProxy();
     }
 }
