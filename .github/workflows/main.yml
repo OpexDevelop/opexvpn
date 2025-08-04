@@ -1,416 +1,94 @@
-name: Test Proxies and Update Results
+name: Test Proxy Servers
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
   schedule:
     - cron: '0 0 * * *'
 
 jobs:
-  update_and_test_proxies:
+  test-proxies:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Required for GITHUB_TOKEN to push
+      contents: write
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # persist-credentials: false # Default is true, but explicit false is fine if handled.
-          # We will explicitly use GITHUB_TOKEN for pushes.
-          token: ${{ secrets.GITHUB_TOKEN }} # Ensures checkout has token for subsequent git operations if needed, though we push explicitly
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          python-version: '3.10'
+          node-version: '20'
 
-      - name: Install PyYAML and other dependencies
+      - name: Install Node.js dependencies
         run: |
-          pip install PyYAML
+          npm install
+
+      - name: Install system dependencies
+        run: |
           sudo apt-get update
-          sudo apt-get install -y curl jq speedtest-cli yq coreutils
-
-      - name: Fetch Gist, encode, and commit encoded_subscription.txt
-        id: update_encoded_file
-        run: |
-          GIST_URL="https://gist.githubusercontent.com/OpexDevelop/a676272468c9b6ac804092250ce9bc67/raw/opexvpn-high.txt"
-          ENCODED_FILE_NAME="encoded_subscription.txt"
-          echo "Fetching content from Gist: $GIST_URL"
-          if ! curl -sL "$GIST_URL" -o original_sub_content.tmp; then
-            echo "Failed to download from Gist."
-            exit 1
-          fi
-          echo "Encoding Gist content to Base64..."
-          base64 -w 0 original_sub_content.tmp > "$ENCODED_FILE_NAME"
-          rm original_sub_content.tmp
-          echo "Encoded content saved to $ENCODED_FILE_NAME"
-          echo "encoded_file_name=$ENCODED_FILE_NAME" >> $GITHUB_OUTPUT
-
-          git config --global user.name 'GitHub Actions Bot'
-          git config --global user.email 'github-actions-bot@users.noreply.github.com'
-          git add "$ENCODED_FILE_NAME"
-          if ! git diff --staged --quiet; then
-            echo "Changes detected in $ENCODED_FILE_NAME. Committing and pushing..."
-            git commit -m "Update $ENCODED_FILE_NAME from Gist"
-            # Use GITHUB_TOKEN for push
-            git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} HEAD:${{ github.ref_name }}
-            echo "$ENCODED_FILE_NAME updated and pushed to repository."
-            echo "Waiting a few seconds for GitHub to process the push..."
-            sleep 15
-          else
-            echo "No changes to $ENCODED_FILE_NAME from Gist. No push needed for this file."
-          fi
-
-      - name: Download and prepare subconverter
-        id: prepare_subconverter
-        run: |
-          SUBVERTER_VERSION="v0.9.0"
-          echo "Downloading subconverter..."
-          wget https://github.com/tindy2013/subconverter/releases/download/${SUBVERTER_VERSION}/subconverter_linux64.tar.gz
-          rm -rf ./subconverter
-          tar -xvf subconverter_linux64.tar.gz
-          ACTUAL_SUBCONVERTER_BINARY="./subconverter/subconverter"
-          if [ ! -f "$ACTUAL_SUBCONVERTER_BINARY" ]; then
-            echo "Subconverter binary not found at $ACTUAL_SUBCONVERTER_BINARY"
-            ls -lahR .
-            exit 1
-          fi
-          chmod +x "$ACTUAL_SUBCONVERTER_BINARY"
-          cat <<EOF > pref.ini
-          [server]
-          listen = 127.0.0.1
-          port = 25500
-          [common]
-          clash_rule_base=
-          surge_rule_base=
-          surfboard_rule_base=
-          mellow_rule_base=
-          loon_rule_base=
-          sssub_rule_base=
-          default_external_config=
-          EOF
-          echo "pref.ini created."
-          echo "subconverter_binary_path=$ACTUAL_SUBCONVERTER_BINARY" >> $GITHUB_OUTPUT
-
-      - name: Start and health check subconverter
-        run: |
-          ACTUAL_SUBCONVERTER_BINARY="${{ steps.prepare_subconverter.outputs.subconverter_binary_path }}"
-          echo "Starting subconverter ($ACTUAL_SUBCONVERTER_BINARY)..."
-          nohup "$ACTUAL_SUBCONVERTER_BINARY" > subconverter.log 2>&1 &
-          SUBCONVERTER_PID=$!
-          echo "Subconverter PID: $SUBCONVERTER_PID"
-          sleep 8
-          if ! ps -p $SUBCONVERTER_PID > /dev/null; then
-            echo "Subconverter process $SUBCONVERTER_PID is not running!"
-            cat subconverter.log
-            exit 1
-          fi
-          echo "Subconverter is running (PID: $SUBCONVERTER_PID)."
-          if curl --connect-timeout 5 -sfS "http://127.0.0.1:25500/sub" > /dev/null; then
-            echo "Health check: Unexpected HTTP success (2xx) from /sub."
-          elif [ $? -eq 22 ]; then
-            echo "Health check successful (expected HTTP error from /sub)."
-          else
-            CURL_EXIT_CODE=$?
-            echo "Health check failed. Curl exit code: $CURL_EXIT_CODE"
-            cat subconverter.log
-            ss -tulnp || sudo ss -tulnp
-            exit 1
-          fi
+          sudo apt-get install -y curl jq bc
 
       - name: Download and install Sing-box
         run: |
-          SINGBOX_VERSION="1.11.10" # Consider using a newer stable like 1.9.x if 1.11.x is beta/dev
-          # Or use latest stable:
-          # SINGBOX_VERSION=$(curl -s "https://api.github.com/repos/SagerNet/sing-box/releases/latest" | jq -r .tag_name | sed 's/v//')
-          echo "Using Sing-box version: $SINGBOX_VERSION"
+          SINGBOX_VERSION="1.11.15"
+          echo "Installing Sing-box version: $SINGBOX_VERSION"
           wget https://github.com/SagerNet/sing-box/releases/download/v${SINGBOX_VERSION}/sing-box-${SINGBOX_VERSION}-linux-amd64.tar.gz
           tar -xzf sing-box-${SINGBOX_VERSION}-linux-amd64.tar.gz
-          # Adjust path based on archive structure for the specific version
           RELEASE_DIR_NAME="sing-box-${SINGBOX_VERSION}-linux-amd64"
           if [ -f ./${RELEASE_DIR_NAME}/sing-box ]; then
             sudo mv ./${RELEASE_DIR_NAME}/sing-box /usr/local/bin/sing-box
-          elif [ -f ./sing-box ]; then # Fallback for simpler archive structures
-             sudo mv ./sing-box /usr/local/bin/sing-box
+          elif [ -f ./sing-box ]; then
+            sudo mv ./sing-box /usr/local/bin/sing-box
           else
-            echo "Sing-box binary not found after extraction. Listing files in expected dir:"
-            ls -lah ./${RELEASE_DIR_NAME}/
-            echo "Listing files in current dir:"
-            ls -lah ./
+            echo "Sing-box binary not found!"
             exit 1
           fi
           sudo chmod +x /usr/local/bin/sing-box
           sing-box version
 
-      - name: Ensure Python script is executable
-        run: chmod +x scripts/generate_singbox_config.py
-
-      - name: Fetch and process subscription from REPO file URL
-        id: process_nodes
+      - name: Run proxy tests
         env:
-          # Construct URL to the raw file in the repo, using the branch that triggered the workflow
-          REPO_FILE_URL: "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.ref_name }}/${{ steps.update_encoded_file.outputs.encoded_file_name }}"
+          LINKS_HIGH: ${{ secrets.LINKS_HIGH }}
         run: |
-          SUBSCRIPTION_URL_FROM_REPO_RAW="$REPO_FILE_URL"
-          
-          echo "Using subscription URL from repository: $SUBSCRIPTION_URL_FROM_REPO_RAW"
-          SUBSCRIPTION_URL_ENCODED=$(echo -n "$SUBSCRIPTION_URL_FROM_REPO_RAW" | jq -sRr @uri)
-          
-          echo "Checking accessibility of $SUBSCRIPTION_URL_FROM_REPO_RAW..."
-          # Retry mechanism for accessing the raw file, as there can be a slight delay after push
-          n=0
-          until curl --output /dev/null --silent --head --fail "$SUBSCRIPTION_URL_FROM_REPO_RAW"; do
-            n=$((n+1))
-            if [ $n -ge 3 ]; then
-              echo "Failed to access $SUBSCRIPTION_URL_FROM_REPO_RAW after multiple retries. Exiting."
-              exit 1
-            fi
-            echo "Failed to access $SUBSCRIPTION_URL_FROM_REPO_RAW. Retrying in 5 seconds..."
-            sleep 5
-          done
-          echo "$SUBSCRIPTION_URL_FROM_REPO_RAW is accessible."
-          
-          echo "Fetching and converting subscription (from repo file URL, content is base64) to Clash format..."
-          if ! curl --fail -sL "http://127.0.0.1:25500/sub?target=clash&url=${SUBSCRIPTION_URL_ENCODED}&base64=true" -o sub_clash_config.yaml; then
-            CURL_EXIT_CODE_SUB=$?
-            echo "Curl command failed to get subscription from subconverter. Exit code: $CURL_EXIT_CODE_SUB"
-            cat subconverter.log
-            exit 1
-          fi
-          
-          if [ ! -s sub_clash_config.yaml ] || ! grep -q "proxies:" sub_clash_config.yaml; then
-            echo "Failed to convert subscription or subscription is empty/invalid (no 'proxies:' section)."
-            echo "--- sub_clash_config.yaml (first 20 lines) ---"
-            head -n 20 sub_clash_config.yaml
-            echo "--- subconverter.log ---"
-            cat subconverter.log
-            exit 1
-          fi
-          echo "Subscription converted to sub_clash_config.yaml"
+          node index.js
 
-          RESULTS_JSON_ARRAY="[]"
-          
-          PROXY_COUNT=$(yq '.proxies | length' sub_clash_config.yaml)
-          if [ -z "$PROXY_COUNT" ] || [ "$PROXY_COUNT" -eq 0 ]; then
-            echo "No proxies found in the converted Clash config."
-            cat sub_clash_config.yaml
-            pkill subconverter || echo "Subconverter not running."
-            exit 0 # Exit gracefully if no proxies
-          fi
-          echo "Found $PROXY_COUNT proxies to test."
-
-          for i in $(seq 0 $((PROXY_COUNT - 1))); do
-            NODE_NAME_RAW=$(yq -r ".proxies[$i].name" sub_clash_config.yaml)
-            # Sanitize node name for use in filenames and IDs
-            NODE_ID_SUFFIX=$(echo "$NODE_NAME_RAW" | tr -dc 'a-zA-Z0-9_.-' | sed 's/[^a-zA-Z0-9_-]/_/g')"_${i}"
-            NODE_ID="node_${NODE_ID_SUFFIX}"
-
-            echo "" # Newline for better readability
-            echo "========================================"
-            echo "Processing Node $((i + 1))/$PROXY_COUNT: $NODE_NAME_RAW (ID: $NODE_ID)"
-            echo "========================================"
-            TEMP_SINGBOX_CONFIG="temp_singbox_config_${NODE_ID}.json"
-            SINGBOX_NODE_LOG="singbox_node_${NODE_ID}.log"
-
-            echo "--- Clash Node JSON for $NODE_NAME_RAW ---"
-            yq -r ".proxies[$i] | tojson" sub_clash_config.yaml
-            echo "----------------------------------------"
-
-            # Generate sing-box config
-            if ! yq -r ".proxies[$i] | tojson" sub_clash_config.yaml | python3 scripts/generate_singbox_config.py "$NODE_ID" > "$TEMP_SINGBOX_CONFIG"; then
-                echo "Python script failed to generate sing-box config for node $NODE_NAME_RAW. Skipping."
-                cat "$TEMP_SINGBOX_CONFIG" # Show output which might contain Python errors
-                CURRENT_NODE_JSON=$(jq -n --arg name "$NODE_NAME_RAW" --arg error "Python script config generation failed" '{name: $name, status: "error", error: $error, timestamp: (now | strftime("%Y-%m-%dT%H:%M:%SZ"))}')
-                RESULTS_JSON_ARRAY=$(echo "$RESULTS_JSON_ARRAY" | jq --argjson item "$CURRENT_NODE_JSON" '. + [$item]')
-                rm -f "$TEMP_SINGBOX_CONFIG"
-                continue
-            fi
-            
-            if ! grep -q '"type":' "$TEMP_SINGBOX_CONFIG" || [ ! -s "$TEMP_SINGBOX_CONFIG" ]; then # Check if config is valid JSON with type
-                echo "Failed to generate valid sing-box config for node $NODE_NAME_RAW (empty or invalid JSON). Skipping."
-                echo "--- Generated Sing-box Config (or error output) ---"
-                cat "$TEMP_SINGBOX_CONFIG"
-                echo "---------------------------------------------------"
-                CURRENT_NODE_JSON=$(jq -n --arg name "$NODE_NAME_RAW" --arg error "Invalid/Empty Sing-box config generated" '{name: $name, status: "error", error: $error, timestamp: (now | strftime("%Y-%m-%dT%H:%M:%SZ"))}')
-                RESULTS_JSON_ARRAY=$(echo "$RESULTS_JSON_ARRAY" | jq --argjson item "$CURRENT_NODE_JSON" '. + [$item]')
-                rm -f "$TEMP_SINGBOX_CONFIG"
-                continue
-            fi
-            
-            echo "Starting Sing-box for $NODE_ID..."
-            # Validate config before running
-            if ! sing-box check -c "$TEMP_SINGBOX_CONFIG"; then
-                echo "Sing-box config check failed for $NODE_ID."
-                cat "$TEMP_SINGBOX_CONFIG"
-                CURRENT_NODE_JSON=$(jq -n --arg name "$NODE_NAME_RAW" --arg error "Sing-box config check failed" '{name: $name, status: "error", error: $error, timestamp: (now | strftime("%Y-%m-%dT%H:%M:%SZ"))}')
-                RESULTS_JSON_ARRAY=$(echo "$RESULTS_JSON_ARRAY" | jq --argjson item "$CURRENT_NODE_JSON" '. + [$item]')
-                rm -f "$TEMP_SINGBOX_CONFIG"
-                continue
-            fi
-
-            sing-box run -c "$TEMP_SINGBOX_CONFIG" > "$SINGBOX_NODE_LOG" 2>&1 &
-            SINGBOX_PID=$!
-            sleep 8 # Give sing-box time to start
-
-            NODE_TEST_SUCCESS=true
-            IP_ADDRESS="N/A"; COUNTRY="N/A"; CITY="N/A"; ASN_ORG="N/A"; ASN_NUMBER="N/A"
-            PING="N/A"; DOWNLOAD_SPEED="N/A"; UPLOAD_SPEED="N/A"
-            ERROR_MESSAGE=""
-
-            if ! ps -p $SINGBOX_PID > /dev/null; then
-                echo "Sing-box failed to start or crashed for $NODE_ID. PID: $SINGBOX_PID"
-                ERROR_MESSAGE="Sing-box failed to start/crashed"
-                NODE_TEST_SUCCESS=false
-            else
-                echo "Sing-box started with PID $SINGBOX_PID for $NODE_ID."
-                PROXY_ADDRESS="socks5h://127.0.0.1:10808"
-
-                echo "Testing IP for $NODE_ID..."
-                # Use a timeout for curl, and handle failures
-                if ! IP_INFO_RAW=$(curl -s --connect-timeout 10 --max-time 15 --proxy "$PROXY_ADDRESS" "https://ip.oxylabs.io/location"); then
-                    echo "Curl for IP test failed for $NODE_ID (or timed out)."
-                    IP_INFO_RAW="{}" # Ensure jq doesn't fail on empty input
-                    ERROR_MESSAGE="IP test failed/timeout"
-                    # Consider this a partial failure, speedtest might still work or provide insights
-                fi
-                
-                IP_ADDRESS=$(echo "$IP_INFO_RAW" | jq -r '.ip // "N/A"')
-                COUNTRY=$(echo "$IP_INFO_RAW" | jq -r '.providers.dbip.country // .providers.ip2location.country // .providers.ipinfo.country // .providers.maxmind.country // "N/A"')
-                CITY=$(echo "$IP_INFO_RAW" | jq -r '.providers.dbip.city // .providers.ip2location.city // .providers.ipinfo.city // .providers.maxmind.city // "N/A"')
-                ASN_ORG=$(echo "$IP_INFO_RAW" | jq -r '.providers.dbip.org_name // .providers.ip2location.org_name // .providers.ipinfo.org_name // .providers.maxmind.org_name // "N/A"')
-                ASN_NUMBER=$(echo "$IP_INFO_RAW" | jq -r '.providers.dbip.asn // .providers.ip2location.asn // .providers.ipinfo.asn // .providers.maxmind.asn // "N/A"')
-
-                if [ "$IP_ADDRESS" = "N/A" ] && [ "$ERROR_MESSAGE" = "" ]; then # If IP is N/A but no curl error, means service returned no IP
-                    ERROR_MESSAGE="IP info service returned no IP"
-                fi
-
-                echo "Running speedtest for $NODE_ID..."
-                SPEEDTEST_OUTPUT_FILE="speedtest_output_${NODE_ID}.txt"
-                SPEEDTEST_ERROR_FILE="speedtest_error_${NODE_ID}.txt"
-                
-                # Only run speedtest if IP test was somewhat successful or not a hard fail
-                if [ "$NODE_TEST_SUCCESS" = true ] || [ "$ERROR_MESSAGE" = "IP test failed/timeout" ] || [ "$ERROR_MESSAGE" = "IP info service returned no IP" ]; then
-                    if ALL_PROXY="$PROXY_ADDRESS" speedtest-cli --simple --timeout 45 > "$SPEEDTEST_OUTPUT_FILE" 2> "$SPEEDTEST_ERROR_FILE"; then
-                      SPEEDTEST_RESULT_RAW=$(cat "$SPEEDTEST_OUTPUT_FILE")
-                    else
-                      echo "Speedtest command failed for $NODE_ID. Exit code: $?"
-                      if [ -s "$SPEEDTEST_ERROR_FILE" ]; then
-                        SPEEDTEST_ERR_MSG=$(cat "$SPEEDTEST_ERROR_FILE" | head -n 1) # Get first line of error
-                        ERROR_MESSAGE="Speedtest failed: $SPEEDTEST_ERR_MSG"
-                      else
-                        ERROR_MESSAGE="Speedtest failed (unknown reason)"
-                      fi
-                      NODE_TEST_SUCCESS=false # Mark as full failure if speedtest fails critically
-                      SPEEDTEST_RESULT_RAW="Ping: N/A ms Download: N/A Mbit/s Upload: N/A Mbit/s" # Default values
-                    fi
-                    rm -f "$SPEEDTEST_OUTPUT_FILE" "$SPEEDTEST_ERROR_FILE"
-
-                    PING=$(echo "$SPEEDTEST_RESULT_RAW" | grep -oP 'Ping: \K[0-9.]+(?= ms)' || echo "N/A")
-                    DOWNLOAD_SPEED=$(echo "$SPEEDTEST_RESULT_RAW" | grep -oP 'Download: \K[0-9.]+(?= Mbit/s)' || echo "N/A")
-                    UPLOAD_SPEED=$(echo "$SPEEDTEST_RESULT_RAW" | grep -oP 'Upload: \K[0-9.]+(?= Mbit/s)' || echo "N/A")
-                else
-                    echo "Skipping speedtest due to earlier critical failure for $NODE_ID."
-                fi
-            fi # End of if sing-box process is running
-
-            # Stop Sing-box if it was started
-            if ps -p $SINGBOX_PID > /dev/null 2>&1 ; then
-                echo "Stopping Sing-box for $NODE_ID (PID $SINGBOX_PID)..."
-                kill -SIGTERM $SINGBOX_PID || echo "Failed to send SIGTERM to Sing-box PID $SINGBOX_PID"
-                # Wait for graceful shutdown, then force kill if necessary
-                n_kill_wait=0
-                while ps -p $SINGBOX_PID > /dev/null 2>&1 && [ $n_kill_wait -lt 5 ]; do # Wait up to 5s
-                  sleep 1
-                  n_kill_wait=$((n_kill_wait+1))
-                done
-                if ps -p $SINGBOX_PID > /dev/null 2>&1; then
-                    echo "Sing-box PID $SINGBOX_PID did not terminate gracefully, sending SIGKILL."
-                    kill -SIGKILL $SINGBOX_PID || echo "Failed to send SIGKILL to Sing-box PID $SINGBOX_PID"
-                fi
-                wait $SINGBOX_PID 2>/dev/null # Clean up zombie process
-                echo "Sing-box stopped for $NODE_ID."
-            fi
-
-            echo "--- Test Results for $NODE_NAME_RAW (ID: $NODE_ID) ---"
-            echo "IP Address: $IP_ADDRESS"
-            echo "Country: $COUNTRY"
-            echo "City: $CITY"
-            echo "ASN Org: $ASN_ORG"
-            echo "ASN Number: $ASN_NUMBER"
-            echo "Ping: $PING ms"
-            echo "Download: $DOWNLOAD_SPEED Mbit/s"
-            echo "Upload: $UPLOAD_SPEED Mbit/s"
-            if [ "$NODE_TEST_SUCCESS" = false ] || [ -n "$ERROR_MESSAGE" ]; then
-                echo "Status: Error"
-                echo "Error Message: $ERROR_MESSAGE"
-            else
-                echo "Status: Tested OK"
-            fi
-            echo "--------------------------------------------------"
-
-            if [ -s "$SINGBOX_NODE_LOG" ]; then
-                echo "--- Sing-box Log for $NODE_ID ($SINGBOX_NODE_LOG) ---"
-                cat "$SINGBOX_NODE_LOG"
-                echo "-------------------------------------------------"
-            fi
-            rm -f "$SINGBOX_NODE_LOG" "$TEMP_SINGBOX_CONFIG"
-            
-            # Construct JSON for this node
-            if [ "$NODE_TEST_SUCCESS" = false ] || [ -n "$ERROR_MESSAGE" ]; then
-                 CURRENT_NODE_JSON=$(jq -n \
-                    --arg name "$NODE_NAME_RAW" \
-                    --arg ip "$IP_ADDRESS" \
-                    --arg country "$COUNTRY" \
-                    --arg city "$CITY" \
-                    --arg asn_org "$ASN_ORG" \
-                    --arg asn_number "$ASN_NUMBER" \
-                    --arg ping "$PING" \
-                    --arg download "$DOWNLOAD_SPEED" \
-                    --arg upload "$UPLOAD_SPEED" \
-                    --arg error_msg "$ERROR_MESSAGE" \
-                    '{name: $name, ip_address: $ip, country_code: $country, city: $city, asn_organization: $asn_org, asn_number: $asn_number, ping_ms: $ping, download_mbps: $download, upload_mbps: $upload, status: "error", error: $error_msg, timestamp: (now | strftime("%Y-%m-%dT%H:%M:%SZ"))}')
-            else
-                CURRENT_NODE_JSON=$(jq -n \
-                  --arg name "$NODE_NAME_RAW" \
-                  --arg ip "$IP_ADDRESS" \
-                  --arg country "$COUNTRY" \
-                  --arg city "$CITY" \
-                  --arg asn_org "$ASN_ORG" \
-                  --arg asn_number "$ASN_NUMBER" \
-                  --arg ping "$PING" \
-                  --arg download "$DOWNLOAD_SPEED" \
-                  --arg upload "$UPLOAD_SPEED" \
-                  '{name: $name, ip_address: $ip, country_code: $country, city: $city, asn_organization: $asn_org, asn_number: $asn_number, ping_ms: $ping, download_mbps: $download, upload_mbps: $upload, status: "tested", timestamp: (now | strftime("%Y-%m-%dT%H:%M:%SZ"))}')
-            fi
-            
-            RESULTS_JSON_ARRAY=$(echo "$RESULTS_JSON_ARRAY" | jq --argjson item "$CURRENT_NODE_JSON" '. + [$item]')
-            echo "------------------------------------"
-            # End of loop
-          done
-
-          echo "$RESULTS_JSON_ARRAY" | jq '.' > proxy_results.json # Pretty print JSON
-          echo "All nodes processed. Results saved to proxy_results.json"
-
-          echo "Stopping subconverter..."
-          pkill subconverter || echo "Subconverter not running or already stopped."
-          if ps -p $SUBCONVERTER_PID > /dev/null 2>&1; then # Check if original PID is still there
-            kill -SIGTERM $SUBCONVERTER_PID || echo "Failed to SIGTERM subconverter PID $SUBCONVERTER_PID"
-            sleep 2
-            kill -SIGKILL $SUBCONVERTER_PID 2>/dev/null || echo "Subconverter PID $SUBCONVERTER_PID already gone or SIGKILL failed"
-          fi
-          wait $SUBCONVERTER_PID 2>/dev/null
-
-      - name: Commit results
+      - name: Configure Git
         run: |
           git config --global user.name 'GitHub Actions Bot'
           git config --global user.email 'github-actions-bot@users.noreply.github.com'
-          git add proxy_results.json
+
+      - name: Remove old files and add new ones
+        run: |
+          # Удаляем старые версии файлов из истории
+          if [ -f db.json ]; then
+            git rm --cached db.json 2>/dev/null || true
+          fi
+          
+          if [ -d checked ]; then
+            git rm -r --cached checked 2>/dev/null || true
+          fi
+          
+          # Добавляем новые файлы
+          git add db.json
+          git add checked/
+
+      - name: Commit results
+        run: |
           if ! git diff --staged --quiet; then
             git commit -m "Update proxy test results ($(date -u +'%Y-%m-%d %H:%M:%S UTC'))"
-            # Use GITHUB_TOKEN for push
-            git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} HEAD:${{ github.ref_name }}
+            
+            # Force push чтобы не сохранять историю
+            git push --force-with-lease https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} HEAD:${{ github.ref_name }}
           else
-            echo "No changes to proxy results."
+            echo "No changes to test results."
           fi
+
+      - name: Clean up Git history
+        run: |
+          # Опционально: очистка истории для экономии места
+          git reflog expire --expire=now --all
+          git gc --prune=now --aggressive
