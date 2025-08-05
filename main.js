@@ -2,6 +2,7 @@ import { readFile, writeFile } from 'fs/promises';
 import { collectLinks } from './collector.js';
 import { shouldCheckProxy, getLastRecordedIpInfo, extractGeoData, testProxy, CONCURRENCY_LIMIT, BASE_PORT } from './checker.js';
 import { formatAndSaveSubscriptions } from './formatter.js';
+import { publishToGists } from './gist-publisher.js';
 
 const DB_FILE = './db.json';
 
@@ -183,6 +184,19 @@ export async function runProxyTests() {
     
     // Создаем файлы подписок
     await formatAndSaveSubscriptions(database);
+    
+    // Публикуем в GitHub Gists если есть токен
+    const gistToken = process.env.GIST_TOKEN;
+    if (gistToken) {
+        try {
+            await publishToGists(gistToken);
+        } catch (error) {
+            console.error('Failed to publish to Gists:', error.message);
+            // Не прерываем выполнение, если публикация в Gists не удалась
+        }
+    } else {
+        console.log('GIST_TOKEN not set, skipping Gist publication');
+    }
     
     // Статистика
     const working = database.filter(p => p.status === 'working').length;
