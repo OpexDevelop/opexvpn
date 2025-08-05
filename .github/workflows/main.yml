@@ -53,6 +53,7 @@ jobs:
       - name: Run proxy tests
         env:
           LINKS_HIGH: ${{ secrets.LINKS_HIGH }}
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
         run: |
           node index.js
 
