@@ -1,7 +1,5 @@
 //import { runProxyTests } from './main.js';
 //runProxyTests().catch(console.error);
-
-
 import { convertToOutbounds } from 'singbox-converter';
 import {TUN_INBOUND, ROUTE, RULE_SET, OPEXVPN_LINK, OUTBOUNDS} from './config.js'
 import { writeFile } from 'fs/promises';
@@ -34,7 +32,7 @@ const fetch_opexvpn_links = async () => {
     return {links: text}
 }
 
-export async function converter(){
+const main = async () => {
     let links = await fetch_opexvpn_links()
     if (links.error) {
         console.error(`[!] OpexVPN fetch failed. ${links.error}`)
@@ -62,8 +60,9 @@ export async function converter(){
         auto,
         selector
     ])
-    await writeFile('singbox_config.json', JSON.stringify(base_config, null, 4), 'utf8');
+    await writeFile('output.json', JSON.stringify(base_config, null, 4), 'utf8');
 
 
-};
+};main()
+
 
