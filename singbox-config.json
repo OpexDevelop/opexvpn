@@ -1,0 +1,534 @@
+{
+    "log": {
+        "level": "error",
+        "timestamp": true
+    },
+    "inbounds": [
+        {
+            "type": "tun",
+            "tag": "tun-in",
+            "mtu": 9000,
+            "inet4_address": "172.19.0.1/28",
+            "auto_route": true,
+            "strict_route": true,
+            "endpoint_independent_nat": true,
+            "stack": "mixed",
+            "sniff": true,
+            "sniff_override_destination": true
+        }
+    ],
+    "outbounds": [
+        {
+            "type": "direct",
+            "tag": "direct"
+        },
+        {
+            "type": "direct",
+            "tag": "bypass"
+        },
+        {
+            "type": "block",
+            "tag": "block"
+        },
+        {
+            "tag": "🇱🇻LV#1 · tgvpnbot-pro",
+            "server": "vpn-14.tgvpnbot.com",
+            "server_port": 443,
+            "uuid": "94ad3f54-c3ac-11ef-9af8-0242ac120003",
+            "tls": {
+                "enabled": true,
+                "insecure": false,
+                "server_name": "dev.memfis.me",
+                "reality": {
+                    "enabled": true,
+                    "public_key": "XTSLsJkz4YjQiCdxr2WxZy5MIqMYxKXQp2-IDv9w2C8",
+                    "short_id": "0a545c1781dcec"
+                },
+                "utls": {
+                    "enabled": true,
+                    "fingerprint": "chrome"
+                }
+            },
+            "type": "vless",
+            "flow": "xtls-rprx-vision"
+        },
+        {
+            "tag": "🇸🇪 Швеция ⚡",
+            "server": "pro-se.emrata.top",
+            "server_port": 8443,
+            "uuid": "c58a99da-6793-3819-70dc-ca69a5699be2",
+            "tls": {
+                "enabled": true,
+                "insecure": false,
+                "server_name": "www.apple.com",
+                "reality": {
+                    "enabled": true,
+                    "public_key": "AAZjVvbC7AwPKot_1ygO5VMpN7XYifCA7lG0RNR5sEk",
+                    "short_id": ""
+                },
+                "utls": {
+                    "enabled": true,
+                    "fingerprint": "chrome"
+                }
+            },
+            "type": "vless",
+            "flow": "xtls-rprx-vision"
+        },
+        {
+            "tag": "🇩🇪 Германия",
+            "server": "pro-ru-de.emrata.top",
+            "server_port": 443,
+            "uuid": "c58a99da-6793-3819-70dc-ca69a5699be2",
+            "tls": {
+                "enabled": true,
+                "insecure": false,
+                "server_name": "pro-ru-de.emrata.top",
+                "reality": {
+                    "enabled": true,
+                    "public_key": "F8tqvcuJUSVbxv_i9ZsVOef3EPwULzzDqgvmj3vWNlA",
+                    "short_id": ""
+                },
+                "utls": {
+                    "enabled": true,
+                    "fingerprint": "chrome"
+                }
+            },
+            "type": "vless",
+            "flow": "xtls-rprx-vision"
+        },
+        {
+            "tag": "🇬🇧 Великобритания ",
+            "server": "pro-uk.emrata.top",
+            "server_port": 8443,
+            "uuid": "c58a99da-6793-3819-70dc-ca69a5699be2",
+            "tls": {
+                "enabled": true,
+                "insecure": false,
+                "server_name": "www.apple.com",
+                "reality": {
+                    "enabled": true,
+                    "public_key": "RYnbBzo-UTB4nVMymzJ5B6TgYed7DfOc6O5Pr_htYSc",
+                    "short_id": ""
+                },
+                "utls": {
+                    "enabled": true,
+                    "fingerprint": "chrome"
+                }
+            },
+            "type": "vless",
+            "flow": "xtls-rprx-vision"
+        },
+        {
+            "tag": "🇱🇻 Латвия",
+            "server": "pro-lv.emrata.top",
+            "server_port": 8443,
+            "uuid": "c58a99da-6793-3819-70dc-ca69a5699be2",
+            "tls": {
+                "enabled": true,
+                "insecure": false,
+                "server_name": "www.apple.com",
+                "reality": {
+                    "enabled": true,
+                    "public_key": "FR6PVIXz6-rX_SYdmyJ_Trajrt89RvNiAyYal34Ymys",
+                    "short_id": ""
+                },
+                "utls": {
+                    "enabled": true,
+                    "fingerprint": "chrome"
+                }
+            },
+            "type": "vless",
+            "flow": "xtls-rprx-vision"
+        },
+        {
+            "tag": "🇸🇬 Сингапур",
+            "server": "pro-sg.emrata.top",
+            "server_port": 8443,
+            "uuid": "c58a99da-6793-3819-70dc-ca69a5699be2",
+            "tls": {
+                "enabled": true,
+                "insecure": false,
+                "server_name": "www.apple.com",
+                "reality": {
+                    "enabled": true,
+                    "public_key": "QbgzI4nJ7AlD26GDjrSqktn-WFqcT3al7q2uKUm0v10",
+                    "short_id": ""
+                },
+                "utls": {
+                    "enabled": true,
+                    "fingerprint": "chrome"
+                }
+            },
+            "type": "vless",
+            "flow": "xtls-rprx-vision"
+        },
+        {
+            "tag": "🇦🇺 Австралия",
+            "server": "pro-au.emrata.top",
+            "server_port": 8443,
+            "uuid": "c58a99da-6793-3819-70dc-ca69a5699be2",
+            "tls": {
+                "enabled": true,
+                "insecure": false,
+                "server_name": "www.apple.com",
+                "reality": {
+                    "enabled": true,
+                    "public_key": "nXcZUWZ5A6e_6AP1eq326q0sHk8eUJRjEIyvAox9sz4",
+                    "short_id": ""
+                },
+                "utls": {
+                    "enabled": true,
+                    "fingerprint": "chrome"
+                }
+            },
+            "type": "vless",
+            "flow": "xtls-rprx-vision"
+        },
+        {
+            "tag": "🇵🇱 Польша",
+            "server": "pro-pl.emrata.top",
+            "server_port": 8443,
+            "uuid": "c58a99da-6793-3819-70dc-ca69a5699be2",
+            "tls": {
+                "enabled": true,
+                "insecure": false,
+                "server_name": "www.apple.com",
+                "reality": {
+                    "enabled": true,
+                    "public_key": "m5xJ6vp7KWsgfynITMY3a5uGsrkDb76S7WiAlw2owg4",
+                    "short_id": ""
+                },
+                "utls": {
+                    "enabled": true,
+                    "fingerprint": "chrome"
+                }
+            },
+            "type": "vless",
+            "flow": "xtls-rprx-vision"
+        },
+        {
+            "tag": "🇧🇷 Бразилия",
+            "server": "pro-br.emrata.top",
+            "server_port": 8443,
+            "uuid": "c58a99da-6793-3819-70dc-ca69a5699be2",
+            "tls": {
+                "enabled": true,
+                "insecure": false,
+                "server_name": "www.apple.com",
+                "reality": {
+                    "enabled": true,
+                    "public_key": "1OkKECKhWaBBtGEtgUKoyLkGtyYA_4Sm2AKKRpjkPD0",
+                    "short_id": ""
+                },
+                "utls": {
+                    "enabled": true,
+                    "fingerprint": "chrome"
+                }
+            },
+            "type": "vless",
+            "flow": "xtls-rprx-vision"
+        },
+        {
+            "tag": "🇪🇸 Испания",
+            "server": "pro-es.emrata.top",
+            "server_port": 8443,
+            "uuid": "c58a99da-6793-3819-70dc-ca69a5699be2",
+            "tls": {
+                "enabled": true,
+                "insecure": false,
+                "server_name": "www.apple.com",
+                "reality": {
+                    "enabled": true,
+                    "public_key": "FAZhBe0M0aGaX9q9lN3agsJxLN_Sdao6a881Oz89bwI",
+                    "short_id": ""
+                },
+                "utls": {
+                    "enabled": true,
+                    "fingerprint": "chrome"
+                }
+            },
+            "type": "vless",
+            "flow": "xtls-rprx-vision"
+        },
+        {
+            "tag": "🇰🇿 Казахстан",
+            "server": "pro-kz.emrata.top",
+            "server_port": 8443,
+            "uuid": "c58a99da-6793-3819-70dc-ca69a5699be2",
+            "tls": {
+                "enabled": true,
+                "insecure": false,
+                "server_name": "pro-kz.emrata.top",
+                "reality": {
+                    "enabled": true,
+                    "public_key": "m5xJ6vp7KWsgfynITMY3a5uGsrkDb76S7WiAlw2owg4",
+                    "short_id": ""
+                },
+                "utls": {
+                    "enabled": true,
+                    "fingerprint": "chrome"
+                }
+            },
+            "type": "vless",
+            "flow": "xtls-rprx-vision"
+        },
+        {
+            "tag": "🇺🇸 США",
+            "server": "pro-usa.emrata.top",
+            "server_port": 8443,
+            "uuid": "c58a99da-6793-3819-70dc-ca69a5699be2",
+            "tls": {
+                "enabled": true,
+                "insecure": false,
+                "server_name": "pro-usa.emrata.top",
+                "reality": {
+                    "enabled": true,
+                    "public_key": "uY-4wMHFY1pD8SIwHBfcxVRdolB7NAJIWIbYjaG8iw0",
+                    "short_id": ""
+                },
+                "utls": {
+                    "enabled": true,
+                    "fingerprint": "chrome"
+                }
+            },
+            "type": "vless",
+            "flow": "xtls-rprx-vision"
+        },
+        {
+            "tag": "🇹🇷 Турция",
+            "server": "pro-tr.emrata.top",
+            "server_port": 8443,
+            "uuid": "c58a99da-6793-3819-70dc-ca69a5699be2",
+            "tls": {
+                "enabled": true,
+                "insecure": false,
+                "server_name": "www.apple.com",
+                "reality": {
+                    "enabled": true,
+                    "public_key": "m5xJ6vp7KWsgfynITMY3a5uGsrkDb76S7WiAlw2owg4",
+                    "short_id": ""
+                },
+                "utls": {
+                    "enabled": true,
+                    "fingerprint": "chrome"
+                }
+            },
+            "type": "vless",
+            "flow": "xtls-rprx-vision"
+        },
+        {
+            "tag": "🇫🇷 Франция",
+            "server": "pro-fr.emrata.top",
+            "server_port": 8443,
+            "uuid": "c58a99da-6793-3819-70dc-ca69a5699be2",
+            "tls": {
+                "enabled": true,
+                "insecure": false,
+                "server_name": "pro-fr.emrata.top",
+                "reality": {
+                    "enabled": true,
+                    "public_key": "m5xJ6vp7KWsgfynITMY3a5uGsrkDb76S7WiAlw2owg4",
+                    "short_id": ""
+                },
+                "utls": {
+                    "enabled": true,
+                    "fingerprint": "chrome"
+                }
+            },
+            "type": "vless",
+            "flow": "xtls-rprx-vision"
+        },
+        {
+            "tag": "🇿🇦 Южная Африка",
+            "server": "pro-za.emrata.top",
+            "server_port": 8443,
+            "uuid": "c58a99da-6793-3819-70dc-ca69a5699be2",
+            "tls": {
+                "enabled": true,
+                "insecure": false,
+                "server_name": "www.apple.com",
+                "reality": {
+                    "enabled": true,
+                    "public_key": "iLJupcqb9j6vga8TGTWcMspOSTxk0fzSyCdBvGLlogc",
+                    "short_id": ""
+                },
+                "utls": {
+                    "enabled": true,
+                    "fingerprint": "chrome"
+                }
+            },
+            "type": "vless",
+            "flow": "xtls-rprx-vision"
+        },
+        {
+            "tag": "🇯🇵 Япония",
+            "server": "pro-jp.emrata.top",
+            "server_port": 8443,
+            "uuid": "c58a99da-6793-3819-70dc-ca69a5699be2",
+            "tls": {
+                "enabled": true,
+                "insecure": false,
+                "server_name": "www.apple.com",
+                "reality": {
+                    "enabled": true,
+                    "public_key": "m5xJ6vp7KWsgfynITMY3a5uGsrkDb76S7WiAlw2owg4",
+                    "short_id": ""
+                },
+                "utls": {
+                    "enabled": true,
+                    "fingerprint": "chrome"
+                }
+            },
+            "type": "vless",
+            "flow": "xtls-rprx-vision"
+        },
+        {
+            "tag": "🌐 YouTube (глобальный)",
+            "server": "pro-usa-yt.emrata.top",
+            "server_port": 443,
+            "uuid": "c58a99da-6793-3819-70dc-ca69a5699be2",
+            "tls": {
+                "enabled": true,
+                "insecure": false,
+                "server_name": "www.apple.com",
+                "reality": {
+                    "enabled": true,
+                    "public_key": "m5xJ6vp7KWsgfynITMY3a5uGsrkDb76S7WiAlw2owg4",
+                    "short_id": ""
+                },
+                "utls": {
+                    "enabled": true,
+                    "fingerprint": "chrome"
+                }
+            },
+            "type": "vless",
+            "flow": "xtls-rprx-vision"
+        },
+        {
+            "type": "urltest",
+            "tag": "auto",
+            "outbounds": [
+                "🇱🇻LV#1 · tgvpnbot-pro",
+                "🇸🇪 Швеция ⚡",
+                "🇩🇪 Германия",
+                "🇬🇧 Великобритания ",
+                "🇱🇻 Латвия",
+                "🇸🇬 Сингапур",
+                "🇦🇺 Австралия",
+                "🇵🇱 Польша",
+                "🇧🇷 Бразилия",
+                "🇪🇸 Испания",
+                "🇰🇿 Казахстан",
+                "🇺🇸 США",
+                "🇹🇷 Турция",
+                "🇫🇷 Франция",
+                "🇿🇦 Южная Африка",
+                "🇯🇵 Япония",
+                "🌐 YouTube (глобальный)"
+            ],
+            "url": "http://connectivitycheck.gstatic.com/generate_204",
+            "interval": "10m0s",
+            "tolerance": 1,
+            "idle_timeout": "30m0s"
+        },
+        {
+            "type": "selector",
+            "tag": "select",
+            "outbounds": [
+                "🇱🇻LV#1 · tgvpnbot-pro",
+                "🇸🇪 Швеция ⚡",
+                "🇩🇪 Германия",
+                "🇬🇧 Великобритания ",
+                "🇱🇻 Латвия",
+                "🇸🇬 Сингапур",
+                "🇦🇺 Австралия",
+                "🇵🇱 Польша",
+                "🇧🇷 Бразилия",
+                "🇪🇸 Испания",
+                "🇰🇿 Казахстан",
+                "🇺🇸 США",
+                "🇹🇷 Турция",
+                "🇫🇷 Франция",
+                "🇿🇦 Южная Африка",
+                "🇯🇵 Япония",
+                "🌐 YouTube (глобальный)",
+                "auto"
+            ],
+            "default": "auto"
+        }
+    ],
+    "route": {
+        "rules": [
+            {
+                "ip_is_private": true,
+                "outbound": "bypass"
+            },
+            {
+                "rule_set": [
+                    "geosite-ads",
+                    "geosite-malware",
+                    "geosite-phishing",
+                    "geosite-cryptominers",
+                    "geoip-malware",
+                    "geoip-phishing"
+                ],
+                "outbound": "block"
+            },
+            {
+                "domain_suffix": ".ru",
+                "outbound": "direct"
+            }
+        ],
+        "rule_set": [
+            {
+                "type": "remote",
+                "tag": "geosite-ads",
+                "format": "binary",
+                "url": "https://raw.githubusercontent.com/hiddify/hiddify-geo/rule-set/block/geosite-category-ads-all.srs",
+                "update_interval": "120h0m0s"
+            },
+            {
+                "type": "remote",
+                "tag": "geosite-malware",
+                "format": "binary",
+                "url": "https://raw.githubusercontent.com/hiddify/hiddify-geo/rule-set/block/geosite-malware.srs",
+                "update_interval": "120h0m0s"
+            },
+            {
+                "type": "remote",
+                "tag": "geosite-phishing",
+                "format": "binary",
+                "url": "https://raw.githubusercontent.com/hiddify/hiddify-geo/rule-set/block/geosite-phishing.srs",
+                "update_interval": "120h0m0s"
+            },
+            {
+                "type": "remote",
+                "tag": "geosite-cryptominers",
+                "format": "binary",
+                "url": "https://raw.githubusercontent.com/hiddify/hiddify-geo/rule-set/block/geosite-cryptominers.srs",
+                "update_interval": "120h0m0s"
+            },
+            {
+                "type": "remote",
+                "tag": "geoip-phishing",
+                "format": "binary",
+                "url": "https://raw.githubusercontent.com/hiddify/hiddify-geo/rule-set/block/geoip-phishing.srs",
+                "update_interval": "120h0m0s"
+            },
+            {
+                "type": "remote",
+                "tag": "geoip-malware",
+                "format": "binary",
+                "url": "https://raw.githubusercontent.com/hiddify/hiddify-geo/rule-set/block/geoip-malware.srs",
+                "update_interval": "120h0m0s"
+            }
+        ],
+        "final": "select",
+        "auto_detect_interface": true
+    },
+    "experimental": {
+        "clash_api": {
+            "external_controller": "0.0.0.0:16756"
+        }
+    }
+}
