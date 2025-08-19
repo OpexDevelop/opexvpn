@@ -68,6 +68,10 @@ jobs:
           if [ -f db.json ]; then
             git rm --cached db.json 2>/dev/null || true
           fi
+
+          if [ -f singbox-config.json ]; then
+            git rm --cached singbox-config.json 2>/dev/null || true
+          fi
           
           if [ -d checked ]; then
             git rm -r --cached checked 2>/dev/null || true
@@ -75,6 +79,7 @@ jobs:
           
           # Добавляем новые файлы
           git add db.json
+          git add singbox-config.json
           git add checked/
 
       - name: Commit results
