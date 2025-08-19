@@ -60,7 +60,7 @@ const main = async () => {
         auto,
         selector
     ])
-    await writeFile('output.json', JSON.stringify(base_config, null, 4), 'utf8');
+    await writeFile('singbox-config.json', JSON.stringify(base_config, null, 4), 'utf8');
 
 
 };main()
