@@ -1,0 +1,13 @@
+{
+  "name": "opexvpn",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "singbox-converter": "^1.0.8",
+    "node-fetch": "^3.3.2",
+    "socks-proxy-agent": "^8.0.2",
+    "https-proxy-agent": "^7.0.6",
+    "crypto": "^1.0.1"
+  }
+}
